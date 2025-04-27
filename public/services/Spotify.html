@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ONLINE_SAVER</title>
+  <style>
+    :root {
+      --primary-color: #00e389;
+      --text-color: #333;
+      --background-color: #fff;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--background-color);
+    }
+
+    /* Top Bar */
+    .top-bar {
+      background: #000;
+      color: white;
+      padding: 8px 0;
+      display: flex;
+      justify-content: center;
+      gap: 80px;
+    }
+
+    .top-bar-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .top-bar-item img {
+      width: 20px;
+      height: 20px;
+    }
+
+    /* Navigation */
+    .nav-bar {
+      background: white;
+      padding: 15px 40px;
+      display: flex;
+      align-items: center;
+      border-bottom: 1px solid #eee;
+    }
+
+    .logo {
+      font-size: 24px;
+      font-weight: bold;
+      color: #000;
+      text-decoration: none;
+      margin-right: 40px;
+    }
+
+    .logo span {
+      color: var(--primary-color);
+    }
+
+    .nav-menu {
+      display: flex;
+      gap: 25px;
+      list-style: none;
+      margin-right: auto;
+    }
+
+    .nav-menu li a {
+      color: #666;
+      text-decoration: none;
+      font-size: 15px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .nav-menu li a:after {
+      content: "▾";
+      font-size: 12px;
+    }
+
+    .search-container {
+      position: relative;
+      width: 400px;
+      margin-right: 20px;
+    }
+
+    .search-container input {
+      width: 100%;
+      padding: 10px 15px;
+      border: 1px solid #eee;
+      border-radius: 8px;
+      background: #f8f9fa;
+      font-size: 14px;
+    }
+
+    .search-container input::placeholder {
+      color: #999;
+    }
+
+    .nav-buttons {
+      display: flex;
+      gap: 15px;
+      align-items: center;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: 500;
+      cursor: pointer;
+      font-size: 14px;
+      border: none;
+    }
+
+    .btn-login {
+      background: transparent;
+      color: var(--text-color);
+    }
+
+    .btn-services {
+      background: var(--primary-color);
+      color: white;
+    }
+
+    .language-selector {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-left: 15px;
+    }
+
+    .language-selector img {
+      width: 24px;
+      height: 16px;
+    }
+
+    /* Main Content */
+    .main-content {
+      max-width: 1200px;
+      margin: 80px auto;
+      padding: 0 20px;
+      text-align: center;
+    }
+
+    .title {
+      font-size: 52px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      color: #000;
+      line-height: 1.2;
+    }
+
+    .title span {
+      color: var(--primary-color);
+    }
+
+    .subtitle {
+      font-size: 18px;
+      color: #666;
+      margin-bottom: 50px;
+      line-height: 1.6;
+    }
+
+    .download-box {
+      background: white;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .url-input {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .url-input input {
+      flex: 1;
+      padding: 15px 20px;
+      border: 1px solid #eee;
+      border-radius: 8px;
+      font-size: 15px;
+      background: #fff;
+    }
+
+    .url-input input::placeholder {
+      color: #999;
+    }
+
+    .url-input button {
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 0 30px;
+      font-weight: 500;
+      cursor: pointer;
+      font-size: 15px;
+    }
+
+    .success-message {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 15px;
+      background: #fff;
+      border: 1px solid #eee;
+      border-radius: 8px;
+      margin-top: 20px;
+    }
+
+    .success-message .check-icon {
+      color: var(--primary-color);
+      font-size: 20px;
+    }
+
+    .cloudflare-logo {
+      margin-left: auto;
+      opacity: 0.7;
+    }
+
+    /* Hide elements until needed */
+    #downloadOptions, #preview, #loading, #fileName {
+      display: none;
+    }
+    :root {
+            --gradient-start: #833ab4;
+            --gradient-middle: #fd1d1d;
+            --gradient-end: #fcb045;
+        }
+
+        body {
+            background: linear-gradient(45deg, var(--gradient-start), var(--gradient-middle), var(--gradient-end));
+            min-height: 100vh;
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #262626;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .content-types {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .type-button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 20px;
+            background: #f0f0f0;
+            color: #666;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .type-button.active {
+            background: #0095f6;
+            color: white;
+        }
+
+        .type-button i {
+            font-size: 18px;
+        }
+
+        .input-group {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        input[type="text"] {
+            width: 70%;
+            padding: 12px 20px;
+            border: 1px solid #dbdbdb;
+            border-radius: 24px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+
+        input[type="text"]:focus {
+            border-color: #0095f6;
+        }
+
+        .download-btn {
+            padding: 12px 24px;
+            background: #0095f6;
+            color: white;
+            border: none;
+            border-radius: 24px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: background 0.3s ease;
+        }
+
+        .download-btn:hover {
+            background: #0081d6;
+        }
+
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 12px;
+            background: #fff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            display: none;
+        }
+
+        .video-preview {
+            max-width: 300px;
+            margin: 20px auto;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .video-preview img {
+            width: 100%;
+            display: block;
+        }
+
+        .download-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .download-buttons button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .video-btn {
+            background: #0095f6;
+            color: white;
+        }
+
+        .audio-btn {
+            background: #262626;
+            color: white;
+        }
+
+        .error {
+            color: #ed4956;
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            background: rgba(237, 73, 86, 0.1);
+        }
+
+        .loading {
+            display: none;
+            margin: 20px 0;
+            color: #666;
+        }
+
+        .loading::after {
+            content: "Loading...";
+            animation: loading 1s infinite;
+        }
+
+        @keyframes loading {
+            0% { content: "Loading."; }
+            33% { content: "Loading.."; }
+            66% { content: "Loading..."; }
+        }
+
+        /* Icons for content types */
+        .icon {
+            width: 20px;
+            height: 20px;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 5px;
+            background-size: contain;
+            background-repeat: no-repeat;
+        }
+  </style>
+</head>
+<body>
+  <nav class="nav-bar">
+    <a href="/" class="logo">M<span>Studio</span></a>
+    <ul class="nav-menu">
+      <li><a href='/insta'>Instagram</a></li>
+      <li><a href='/main'>YouTube</a></li>
+      <li><a href='/facebook'>Facebook</a></li>
+      <li><a href='/spotify'>Spotify</a></li>
+      <li><a href='/'>Other</a></li>
+    </ul>
+    <div class="search-container">
+      <input type="text" placeholder="Search">
+    </div>
+    <div class="nav-buttons">
+      <button class="btn btn-services" onclick="handleLoginLogout()">Log in</button>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>Spotify Downloader</h1>
+    <p class="subtitle">Download Audios from Spotify</p>
+    
+    
+
+    <div class="input-group">
+        <input type="text" id="videoUrl" placeholder="Paste Spotify link here">
+        <button class="download-btn" onclick="downloadContent()">Download</button>
+    </div>
+
+    <div id="loading" class="loading"></div>
+    <div id="result" class="result">
+        <div id="videoInfo"></div>
+        <div id="downloadButtons" class="download-buttons"></div>
+    </div>
+    <div id="error" class="error"></div>
+</div>
+
+  <script type="module" src="/scripts/auth.js"></script>
+  <script type="module" src="/scripts/utils.js"></script>
+  <script type="module" src="/scripts-scripts/spotify-service.js"></script>
+</body>
+</html>
