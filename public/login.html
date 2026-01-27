@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Login | ONLINE_SAVER</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://fonts.googleapis.com/css?family=Raleway:400,700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      background: #f5f6fa;
+      font-family: 'Raleway', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .auth-container {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+      padding: 36px 32px 28px 32px;
+      min-width: 320px;
+      max-width: 90vw;
+      width: 100%;
+      max-width: 400px;
+      position: relative;
+    }
+    .auth-tabs {
+      display: flex;
+      margin-bottom: 24px;
+      border-bottom: 1px solid #eee;
+    }
+    .auth-tab {
+      flex: 1;
+      text-align: center;
+      padding: 10px 0;
+      cursor: pointer;
+      font-weight: 700;
+      color: #888;
+      border-bottom: 2px solid transparent;
+      transition: color 0.2s, border 0.2s;
+    }
+    .auth-tab.active {
+      color: #00b894;
+      border-bottom: 2px solid #00b894;
+    }
+    .auth-form {
+      display: none;
+      flex-direction: column;
+      gap: 16px;
+      margin-top: 8px;
+    }
+    .auth-form.active {
+      display: flex;
+    }
+    .auth-form input {
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 1rem;
+      outline: none;
+      transition: border 0.2s;
+    }
+    .auth-form input:focus {
+      border-color: #00b894;
+    }
+    .auth-form button[type="submit"] {
+      background: #00b894;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 0;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .auth-form button[type="submit"]:hover {
+      background: #00916e;
+    }
+    .auth-error {
+      color: #e74c3c;
+      font-size: 0.98rem;
+      display: none;
+      margin-bottom: -8px;
+      margin-top: -8px;
+      text-align: center;
+    }
+    .switch-link {
+      color: #007bff;
+      text-decoration: none;
+      font-weight: 600;
+      cursor: pointer;
+      margin-left: 4px;
+    }
+    .switch-link:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-container">
+    <div class="auth-tabs">
+      <div class="auth-tab active" id="tab-login">Login</div>
+      <div class="auth-tab" id="tab-register">Register</div>
+    </div>
+    <form id="loginForm" class="auth-form active">
+      <input type="text" id="loginEmail" placeholder="Email" required>
+      <input type="password" id="loginPassword" placeholder="Password" required>
+      <div id="loginError" class="auth-error"></div>
+      <button type="submit">Login</button>
+      <div style="text-align:center;font-size:0.98rem;margin-top:8px;">
+        Don't have an account?
+        <span class="switch-link" id="showRegister">Register</span>
+      </div>
+    </form>
+    <form id="registerForm" class="auth-form">
+      <input type="text" id="registerName" placeholder="Name" required>
+      <input type="email" id="registerEmail" placeholder="Email" required>
+      <input type="password" id="registerPassword" placeholder="Password" required>
+      <input type="password" id="registerConfirmPassword" placeholder="Confirm Password" required>
+      <div id="registerError" class="auth-error"></div>
+      <button type="submit">Register</button>
+      <div style="text-align:center;font-size:0.98rem;margin-top:8px;">
+        Already have an account?
+        <span class="switch-link" id="showLogin">Login</span>
+      </div>
+    </form>
+  </div>
+  <script src="scripts/auth.js"></script>
+  <script>
+    // Tab switching logic
+    const tabLogin = document.getElementById('tab-login');
+    const tabRegister = document.getElementById('tab-register');
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    const loginError = document.getElementById('loginError');
+    const registerError = document.getElementById('registerError');
+    const showRegister = document.getElementById('showRegister');
+    const showLogin = document.getElementById('showLogin');
+
+    function switchTab(tab) {
+      if (tab === 'login') {
+        tabLogin.classList.add('active');
+        tabRegister.classList.remove('active');
+        loginForm.classList.add('active');
+        registerForm.classList.remove('active');
+        loginError.style.display = 'none';
+        registerError.style.display = 'none';
+      } else {
+        tabLogin.classList.remove('active');
+        tabRegister.classList.add('active');
+        loginForm.classList.remove('active');
+        registerForm.classList.add('active');
+        loginError.style.display = 'none';
+        registerError.style.display = 'none';
+      }
+    }
+    tabLogin.onclick = () => switchTab('login');
+    tabRegister.onclick = () => switchTab('register');
+    showRegister.onclick = () => switchTab('register');
+    showLogin.onclick = () => switchTab('login');
+
+    // Login handler
+    loginForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      loginError.style.display = 'none';
+      const email = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPassword').value;
+      try {
+        if (window.authManager) {
+          const result = await window.authManager.login(email, password);
+          if (result.success) {
+            window.location.href = '/main';
+          } else {
+            loginError.textContent = result.message || 'Login failed';
+            loginError.style.display = 'block';
+          }
+        } else {
+          loginError.textContent = 'Authentication service not available';
+          loginError.style.display = 'block';
+        }
+      } catch (error) {
+        loginError.textContent = 'An error occurred during login';
+        loginError.style.display = 'block';
+      }
+    });
+    // Register handler
+    registerForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      registerError.style.display = 'none';
+      const name = document.getElementById('registerName').value;
+      const email = document.getElementById('registerEmail').value;
+      const password = document.getElementById('registerPassword').value;
+      const confirmPassword = document.getElementById('registerConfirmPassword').value;
+      if (password !== confirmPassword) {
+        registerError.textContent = 'Passwords do not match';
+        registerError.style.display = 'block';
+        return;
+      }
+      try {
+        if (window.authManager) {
+          const result = await window.authManager.register(name, email, password);
+          if (result.success) {
+            window.location.href = '/main';
+          } else {
+            registerError.textContent = result.message || 'Registration failed';
+            registerError.style.display = 'block';
+          }
+        } else {
+          registerError.textContent = 'Authentication service not available';
+          registerError.style.display = 'block';
+        }
+      } catch (error) {
+        registerError.textContent = 'An error occurred during registration';
+        registerError.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html> 

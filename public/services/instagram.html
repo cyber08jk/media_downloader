@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>ONLINE_SAVER - Instagram</title>
+  <style>
+    :root {
+      --primary-color: #00e389;
+      --text-color: #333;
+      --background-color: #fff;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--background-color);
+      background: linear-gradient(45deg, #833ab4, #fd1d1d, #fcb045);
+      min-height: 100vh;
+    }
+
+    /* Navigation */
+    .nav-bar {
+      background: white;
+      padding: 15px 40px;
+      display: flex;
+      align-items: center;
+      border-bottom: 1px solid #eee;
+    }
+
+    .logo {
+      font-size: 24px;
+      font-weight: bold;
+      color: #000;
+      text-decoration: none;
+      margin-right: 40px;
+    }
+
+    .logo span {
+      color: var(--primary-color);
+    }
+
+    .nav-menu {
+      display: flex;
+      gap: 25px;
+      list-style: none;
+      margin-right: auto;
+    }
+
+    .nav-menu li a {
+      color: #666;
+      text-decoration: none;
+      font-size: 15px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      text-align: center;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+      color: #262626;
+      margin-bottom: 10px;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+    }
+
+    .input-group {
+      margin: 20px 0;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    input[type="text"] {
+      width: 70%;
+      padding: 12px 20px;
+      border: 1px solid #dbdbdb;
+      border-radius: 24px;
+      font-size: 16px;
+      outline: none;
+    }
+
+    .download-btn {
+      padding: 12px 24px;
+      background: #0095f6;
+      color: white;
+      border: none;
+      border-radius: 24px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .result {
+      margin-top: 30px;
+      padding: 20px;
+      border-radius: 12px;
+      background: #fff;
+      display: none;
+    }
+
+    .video-preview img {
+      max-width: 300px;
+      border-radius: 12px;
+    }
+
+    .loading {
+      display: none;
+      margin: 20px 0;
+      color: #666;
+    }
+
+    .error {
+      color: #ed4956;
+      margin-top: 10px;
+      display: none;
+      padding: 10px;
+      background: rgba(237, 73, 86, 0.1);
+      border-radius: 4px;
+    }
+
+    /* List UI Styles */
+    .format-list {
+      margin-top: 20px;
+      text-align: left;
+    }
+
+    .format-group {
+      margin-bottom: 25px;
+    }
+
+    .group-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 18px;
+      font-weight: 600;
+      color: #262626;
+      margin-bottom: 15px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .group-header i {
+      color: #00e389;
+    }
+
+    .group-header.music i {
+      color: #1db954;
+    }
+
+    .format-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 10px;
+      border-bottom: 1px solid #f8f8f8;
+      transition: background 0.2s;
+    }
+
+    .format-row:hover {
+      background: #fafafa;
+    }
+
+    .format-info {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex: 1;
+    }
+
+    .format-badge {
+      background: #ff9800;
+      color: white;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-weight: 700;
+      font-size: 12px;
+      min-width: 50px;
+      text-align: center;
+      text-transform: uppercase;
+    }
+
+    .quality-text {
+      font-weight: 700;
+      color: #333;
+      min-width: 90px;
+      text-transform: uppercase;
+      font-size: 15px;
+    }
+
+    .size-text {
+      color: #666;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .dl-btn-container {
+      position: relative;
+    }
+
+    .dl-btn-list {
+      background: #fff;
+      color: #00c878;
+      border: 2px solid #00c878;
+      border-radius: 8px;
+      padding: 8px 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-weight: 700;
+      transition: all 0.2s;
+      font-size: 14px;
+    }
+
+    .dl-btn-list:hover {
+      background: #00c878;
+      color: #fff;
+    }
+
+    .fast-badge {
+      background: #00c878;
+      color: white;
+      font-size: 9px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      position: absolute;
+      top: -12px;
+      right: -2px;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      white-space: nowrap;
+      font-weight: bold;
+    }
+
+    .filename-box {
+      margin: 20px 0;
+      text-align: left;
+    }
+
+    .filename-box input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      margin-top: 5px;
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+
+<body>
+  <nav class="nav-bar">
+    <a href="/" class="logo">M<span>Studio</span></a>
+    <ul class="nav-menu">
+      <li><a href='/insta'>Instagram</a></li>
+      <li><a href='/main'>YouTube</a></li>
+      <li><a href='/facebook'>Facebook</a></li>
+      <li><a href='/spotify'>Spotify</a></li>
+    </ul>
+  </nav>
+
+  <div class="container">
+    <h1>Instagram Downloader</h1>
+    <p class="subtitle">Download Reels, Videos & Photos</p>
+
+    <div class="input-group">
+      <input type="text" id="videoUrl" placeholder="Paste Instagram link here">
+      <button class="download-btn" onclick="downloadContent()">Download</button>
+    </div>
+
+    <div id="loading" class="loading">Analyzing content...</div>
+    <div id="result" class="result">
+      <div id="videoMeta"></div>
+      <div id="formatList" class="format-list"></div>
+    </div>
+    <div id="error" class="error"></div>
+  </div>
+
+  <script>
+    let videoInfo = null;
+
+    async function downloadContent() {
+      await previewVideo();
+    }
+
+    async function previewVideo() {
+      const videoUrl = document.getElementById('videoUrl').value.trim();
+      const errorDiv = document.getElementById('error');
+      const loadingDiv = document.getElementById('loading');
+      const resultDiv = document.getElementById('result');
+      const videoMetaDiv = document.getElementById('videoMeta');
+      const formatListDiv = document.getElementById('formatList');
+
+      if (!videoUrl) {
+        errorDiv.textContent = 'Please enter an Instagram URL';
+        errorDiv.style.display = 'block';
+        return;
+      }
+
+      errorDiv.style.display = 'none';
+      resultDiv.style.display = 'none';
+      loadingDiv.style.display = 'block';
+
+      try {
+        const response = await fetch('/api/video-info', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: videoUrl })
+        });
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.message || 'Failed to fetch content info');
+        }
+
+        const info = await response.json();
+        videoInfo = info;
+
+        // Metadata
+        videoMetaDiv.innerHTML = `
+          <div class="video-preview">
+            <img src="${info.thumbnail}" alt="Thumbnail">
+          </div>
+          <h3 style="margin: 15px 0;">${info.title || 'Instagram Media'}</h3>
+          <div class="filename-box">
+             <label style="font-weight:600; font-size: 14px;">Filename:</label>
+             <input type="text" id="fileName" placeholder="${info.title || 'instagram_media'}">
+          </div>
+        `;
+
+        // Refine labels
+        const musicFormats = [];
+        const videoFormats = [];
+        const seenRes = new Set();
+
+        info.formats.forEach(f => {
+          let q = (f.quality || '').toString().toUpperCase();
+          if (f.hasVideo) {
+            if (!seenRes.has(q)) {
+              videoFormats.push({ ...f, displayQuality: q });
+              seenRes.add(q);
+            }
+          } else {
+            if (!seenRes.has(q)) {
+              musicFormats.push({ ...f, displayQuality: q });
+              seenRes.add(q);
+            }
+          }
+        });
+
+        const sortedMusic = musicFormats.sort((a, b) => (b.filesize || 0) - (a.filesize || 0)).slice(0, 3);
+        const sortedVideo = videoFormats.sort((a, b) => {
+          let qa = parseInt(a.displayQuality) || 0;
+          let qb = parseInt(b.displayQuality) || 0;
+          return qb - qa;
+        });
+
+        let html = '';
+
+        if (sortedMusic.length > 0) {
+          html += `
+            <div class="format-group">
+              <div class="group-header music"><i class="fas fa-music"></i> Music</div>
+              ${sortedMusic.map(f => renderFormatRow(f, 'MP3')).join('')}
+            </div>
+          `;
+        }
+
+        if (sortedVideo.length > 0) {
+          html += `
+            <div class="format-group">
+              <div class="group-header"><i class="fas fa-video"></i> Video</div>
+              ${sortedVideo.map(f => renderFormatRow(f, 'MP4')).join('')}
+            </div>
+          `;
+        }
+
+        formatListDiv.innerHTML = html;
+        resultDiv.style.display = 'block';
+      } catch (error) {
+        errorDiv.textContent = error.message;
+        errorDiv.style.display = 'block';
+      } finally {
+        loadingDiv.style.display = 'none';
+      }
+    }
+
+    function renderFormatRow(f, badge) {
+      const sizeStr = f.filesize ? (f.filesize / (1024 * 1024)).toFixed(2) + ' MB' : 'Format Only';
+      const quality = f.displayQuality || 'BEST';
+
+      return `
+        <div class="format-row">
+          <div class="format-info">
+            <span class="format-badge">${badge}</span>
+            <span class="quality-text">${quality}</span>
+            <span class="size-text">${sizeStr}</span>
+          </div>
+          <div class="dl-btn-container">
+            <div class="fast-badge"><i class="fas fa-bolt"></i> FAST</div>
+            <button class="dl-btn-list" onclick="triggerDownload('${f.itag}', ${!f.hasVideo})">
+              <i class="fas fa-download"></i> Download
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function triggerDownload(itag, isAudio) {
+      if (!videoInfo) return;
+      const fileName = document.getElementById('fileName').value.trim() || videoInfo.title || 'instagram_media';
+      const endpoint = isAudio ? '/api/download-audio' : '/api/download-video';
+      const data = { url: videoInfo.url, quality: itag, fileName };
+      const params = new URLSearchParams(data).toString();
+      window.location.href = `${endpoint}?${params}`;
+    }
+  </script>
+</body>
+
+</html>

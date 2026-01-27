@@ -1,0 +1,31 @@
+{
+  "dependencies": {
+    "@distube/ytdl-core": "^4.16.12",
+    "bcrypt": "^5.1.1",
+    "body-parser": "^1.20.2",
+    "dotenv": "^16.5.0",
+    "express": "^4.18.2",
+    "express-session": "^1.18.1",
+    "ffmpeg-static": "^5.2.0",
+    "fluent-ffmpeg": "^2.1.2",
+    "instagram-private-api": "^1.46.1",
+    "undici": "^7.19.1",
+    "yt-dlp-wrap": "^2.3.12",
+    "ytdl-core": "npm:@distube/ytdl-core@^4.16.8"
+  },
+  "name": "youtube_download",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "Online video downloader and converter",
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
