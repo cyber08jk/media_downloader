@@ -5,7 +5,9 @@
   <title>ONLINE_SAVER - Spotify</title>
   <style>
     :root {
-      --primary-color: #00e389;
+      --primary-color: #1DB954;
+      --secondary-color: #1AA34A;
+      --accent-color: #1ED760;
       --text-color: #333;
       --background-color: #fff;
     }
@@ -19,8 +21,28 @@
 
     body {
       background-color: var(--background-color);
-      background: linear-gradient(45deg, #833ab4, #fd1d1d, #fcb045);
+      background: linear-gradient(rgba(29, 185, 84, 0.88), rgba(26, 163, 74, 0.88), rgba(22, 141, 63, 0.88)),
+                  url('https://images.unsplash.com/photo-1614680376573-df3480f0c6ff?w=1920&q=80') center/cover fixed;
       min-height: 100vh;
+      position: relative;
+    }
+    
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 60px,
+        rgba(255, 255, 255, 0.02) 60px,
+        rgba(255, 255, 255, 0.02) 120px
+      );
+      z-index: 0;
+      pointer-events: none;
     }
 
     /* Navigation */
@@ -98,13 +120,20 @@
 
     .download-btn {
       padding: 12px 24px;
-      background: #1db954;
+      background: var(--primary-color);
       color: white;
       border: none;
       border-radius: 24px;
       cursor: pointer;
       font-size: 16px;
       font-weight: 600;
+      transition: all 0.3s ease;
+    }
+
+    .download-btn:hover {
+      background: var(--secondary-color);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(29, 185, 84, 0.3);
     }
 
     .result {
@@ -343,32 +372,61 @@
           </div>
         `;
 
-        // Refine labels
-        const seenRes = new Set();
-        const musicFormats = info.formats
-          .map(f => {
-            let q = (f.quality || 'HIGH').toString().toUpperCase();
-            return { ...f, displayQuality: q };
-          })
-          .filter(f => {
-            if (!seenRes.has(f.displayQuality)) {
-              seenRes.add(f.displayQuality);
-              return true;
-            }
-            return false;
-          })
-          .sort((a, b) => (b.filesize || 0) - (a.filesize || 0))
-          .slice(0, 4);
-
+        // Display simple audio/video options
         let html = '';
 
-        if (musicFormats.length > 0) {
-          html += `
-            <div class="format-group">
-              <div class="group-header music"><i class="fas fa-music"></i> Music</div>
-              ${musicFormats.map(f => renderFormatRow(f, 'MP3')).join('')}
-            </div>
-          `;
+        // Check if we have the new simplified format
+        if (info.formats && info.formats.length > 0 && info.formats[0].type) {
+          // New simplified format
+          info.formats.forEach(format => {
+            const icon = format.type === 'audio' ? 'fa-music' : 'fa-video';
+            const badge = format.type === 'audio' ? 'MP3' : 'MP4';
+            const groupClass = format.type === 'audio' ? 'music' : '';
+            
+            html += `
+              <div class="format-group">
+                <div class="group-header ${groupClass}"><i class="fas ${icon}"></i> ${format.label}</div>
+                <div class="format-row">
+                  <div class="format-info">
+                    <span class="format-badge">${badge}</span>
+                    <span class="quality-text">${format.description}</span>
+                  </div>
+                  <div class="dl-btn-container">
+                    <div class="fast-badge"><i class="fas fa-bolt"></i> FAST</div>
+                    <button class="dl-btn-list" onclick="triggerDownload('${format.type}')">
+                      <i class="fas fa-download"></i> Download
+                    </button>
+                  </div>
+                </div>
+              </div>
+            `;
+          });
+        } else {
+          // Old format structure (fallback)
+          const seenRes = new Set();
+          const musicFormats = info.formats
+            .map(f => {
+              let q = (f.quality || 'HIGH').toString().toUpperCase();
+              return { ...f, displayQuality: q };
+            })
+            .filter(f => {
+              if (!seenRes.has(f.displayQuality)) {
+                seenRes.add(f.displayQuality);
+                return true;
+              }
+              return false;
+            })
+            .sort((a, b) => (b.filesize || 0) - (a.filesize || 0))
+            .slice(0, 4);
+
+          if (musicFormats.length > 0) {
+            html += `
+              <div class="format-group">
+                <div class="group-header music"><i class="fas fa-music"></i> Music</div>
+                ${musicFormats.map(f => renderFormatRow(f, 'MP3')).join('')}
+              </div>
+            `;
+          }
         }
 
         formatListDiv.innerHTML = html;
@@ -402,13 +460,23 @@
       `;
     }
 
-    function triggerDownload(itag, isAudio) {
+    function triggerDownload(formatTypeOrItag, isAudio) {
       if (!videoInfo) return;
       const fileName = document.getElementById('fileName').value.trim() || videoInfo.title || 'spotify_audio';
-      const endpoint = isAudio ? '/api/download-audio' : '/api/download-video';
-      const data = { url: videoInfo.url, quality: itag, fileName };
-      const params = new URLSearchParams(data).toString();
-      window.location.href = `${endpoint}?${params}`;
+      
+      // Check if using new simplified format
+      if (formatTypeOrItag === 'audio' || formatTypeOrItag === 'video') {
+        const endpoint = formatTypeOrItag === 'audio' ? '/api/download-audio' : '/api/download-video';
+        const data = { url: videoInfo.url, format: formatTypeOrItag, fileName };
+        const params = new URLSearchParams(data).toString();
+        window.location.href = `${endpoint}?${params}`;
+      } else {
+        // Old format with itag
+        const endpoint = isAudio ? '/api/download-audio' : '/api/download-video';
+        const data = { url: videoInfo.url, quality: formatTypeOrItag, fileName };
+        const params = new URLSearchParams(data).toString();
+        window.location.href = `${endpoint}?${params}`;
+      }
     }
   </script>
 </body>

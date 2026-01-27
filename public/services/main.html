@@ -5,7 +5,9 @@
   <title>ONLINE_SAVER - YouTube</title>
   <style>
     :root {
-      --primary-color: #00e389;
+      --primary-color: #FF0000;
+      --secondary-color: #CC0000;
+      --accent-color: #FF4444;
       --text-color: #333;
       --background-color: #fff;
     }
@@ -19,8 +21,28 @@
 
     body {
       background-color: var(--background-color);
-      background: linear-gradient(45deg, #833ab4, #fd1d1d, #fcb045);
+      background: linear-gradient(rgba(255, 0, 0, 0.85), rgba(204, 0, 0, 0.85), rgba(139, 0, 0, 0.85)),
+                  url('https://images.unsplash.com/photo-1611162616305-c69b3fa7fbe0?w=1920&q=80') center/cover fixed;
       min-height: 100vh;
+      position: relative;
+    }
+    
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 100px,
+        rgba(255, 255, 255, 0.02) 100px,
+        rgba(255, 255, 255, 0.02) 200px
+      );
+      z-index: 0;
+      pointer-events: none;
     }
 
     /* Navigation */
@@ -98,13 +120,20 @@
 
     .download-btn {
       padding: 12px 24px;
-      background: #0095f6;
+      background: var(--primary-color);
       color: white;
       border: none;
       border-radius: 24px;
       cursor: pointer;
       font-size: 16px;
       font-weight: 600;
+      transition: all 0.3s ease;
+    }
+
+    .download-btn:hover {
+      background: var(--secondary-color);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(255, 0, 0, 0.3);
     }
 
     .result {
