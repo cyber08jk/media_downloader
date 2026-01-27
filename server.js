@@ -10,6 +10,14 @@ const os = require('os');
 const app = express();
 const PORT = 3000;
 
+// Optimize for downloads
+app.set('trust proxy', 1);
+
+// Increase payload limits for better handling
+app.use(express.json({ limit: '50mb' }));
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
+
 // Initialize yt-dlp and download binary if needed
 let ytDlp;
 (async () => {
@@ -48,9 +56,6 @@ app.use('/js', express.static(path.join(__dirname, 'js')));
 app.use('/css', express.static(path.join(__dirname, 'public')));
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
-app.use(express.json());
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
 
 // Session middleware
 app.use(session({
@@ -174,23 +179,29 @@ app.post('/api/video-info', requireAuth, async (req, res) => {
         const jsonOutput = await ytDlp.execPromise([
             url,
             '--dump-json',
-            '--no-playlist'
+            '--no-playlist',
+            '--no-warnings',
+            '--skip-download',
+            '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         ]);
 
         const info = JSON.parse(jsonOutput);
 
-        // Filter and map formats
-        const formats = info.formats
-            .map(f => ({
-                itag: f.format_id,
-                quality: f.resolution || (f.height ? `${f.height}p` : null) || (f.abr ? `${Math.round(f.abr)}kbps` : 'Unknown'),
-                mimeType: f.ext,
-                hasAudio: f.acodec !== 'none',
-                hasVideo: f.vcodec !== 'none',
-                container: f.container || f.ext,
-                filesize: f.filesize
-            }))
-            .filter(f => f.hasVideo || f.hasAudio);
+        // Simplified format selection - only audio or video with auto-best quality
+        const formats = [
+            {
+                type: 'video',
+                label: 'Video (Best Quality)',
+                format: 'bestvideo+bestaudio/best',
+                description: 'Highest quality video with audio'
+            },
+            {
+                type: 'audio',
+                label: 'Audio Only (Best Quality)',
+                format: 'bestaudio/best',
+                description: 'Highest quality audio only'
+            }
+        ];
 
         res.json({
             title: info.title,
@@ -202,168 +213,484 @@ app.post('/api/video-info', requireAuth, async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching video info:', error);
-        res.status(500).json({ success: false, message: 'Failed to fetch video info' });
+        const errorMsg = error.message.includes('Video unavailable') ? 'Video is unavailable or private' :
+                        error.message.includes('Sign in') ? 'Video requires sign-in (age-restricted or members-only)' :
+                        error.message.includes('not available') ? 'Video is not available in your region' :
+                        'Failed to fetch video info - video may be unavailable or restricted';
+        res.status(500).json({ success: false, message: errorMsg });
     }
 });
 
-// Specific Video Download route
+// Streaming Video Download route with improved performance
 app.get('/api/download-video', requireAuth, async (req, res) => {
-    const { url, quality, fileName } = req.query;
+    const { url, format, fileName } = req.query;
+    let outputPath = null;
+    
     try {
         if (!url) return res.status(400).send('URL is required');
 
-        const safeFileName = (fileName || 'video').replace(/[^a-z0-9]/gi, '_');
-        const outputPath = path.join(downloadsDir, `${safeFileName}_${Date.now()}.mp4`);
+        const safeFileName = (fileName || 'video').replace(/[^a-z0-9._-]/gi, '_').substring(0, 50);
+        const timestamp = Date.now();
+        outputPath = path.join(downloadsDir, `${safeFileName}_${timestamp}.%(ext)s`);
+        const expectedPath = path.join(downloadsDir, `${safeFileName}_${timestamp}.mp4`);
 
-        console.log(`Downloading video: ${url} quality: ${quality}`);
-        const formatArg = quality ? `${quality}+bestaudio/best` : 'best[ext=mp4]/best';
+        // Auto-select best quality based on format type
+        const formatArg = format === 'audio' ? 'bestaudio/best' : 'bestvideo+bestaudio/best';
+        
+        console.log(`Downloading: ${url}`);
+        console.log(`Format: ${format || 'video'} (${formatArg})`);
+        console.log(`Expected output: ${expectedPath}`);
 
-        await ytDlp.execPromise([
+        // Set headers before starting download
+        res.setHeader('Content-Type', 'video/mp4');
+        res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}.mp4"`);
+        res.setHeader('Cache-Control', 'no-cache');
+
+        // Use streaming for faster downloads
+        const ytDlpProcess = ytDlp.exec([
             url,
             '-f', formatArg,
             '--merge-output-format', 'mp4',
+            '--no-playlist',
+            '--no-warnings',
+            '--no-mtime',
+            '--concurrent-fragments', '4',
+            '--buffer-size', '16K',
+            '--http-chunk-size', '10M',
+            '--remux-video', 'mp4',
+            '--no-keep-fragments',
+            '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            '--referer', url,
+            '--newline',
             '-o', outputPath
         ]);
-
-        res.download(outputPath, `${safeFileName}.mp4`, (err) => {
-            if (err) console.error('Download sending error:', err);
-            fs.unlink(outputPath, (e) => {
-                if (e) console.log('Cleanup error:', e);
+        
+        if (!ytDlpProcess) {
+            console.error('Failed to start yt-dlp process');
+            return res.status(500).send('Failed to start download process');
+        }
+        
+        // Capture stdout/stderr for debugging
+        let downloadLog = '';
+        let errorLog = '';
+        if (ytDlpProcess.stdout) {
+            ytDlpProcess.stdout.on('data', (data) => {
+                downloadLog += data.toString();
             });
+        }
+        if (ytDlpProcess.stderr) {
+            ytDlpProcess.stderr.on('data', (data) => {
+                const msg = data.toString();
+                errorLog += msg;
+                console.log('yt-dlp:', msg);
+            });
+        }
+        
+        outputPath = expectedPath;
+
+        ytDlpProcess.on('error', (error) => {
+            console.error('yt-dlp process error:', error);
+            if (!res.headersSent) {
+                res.status(500).send('Download failed: ' + error.message);
+            }
+        });
+
+        await new Promise((resolve, reject) => {
+            ytDlpProcess.on('close', (code) => {
+                console.log(`yt-dlp process exited with code: ${code}`);
+                if (code === 0) {
+                    resolve();
+                } else {
+                    const errorMsg = errorLog.includes('Video unavailable') ? 'Video is unavailable or private' :
+                                   errorLog.includes('Sign in') ? 'Video requires authentication' :
+                                   errorLog.includes('age') ? 'Video is age-restricted' :
+                                   'Download failed - video may be unavailable or restricted';
+                    reject(new Error(errorMsg));
+                }
+            });
+        });
+
+        console.log('Download completed, checking file...');
+        console.log('Looking for file at:', outputPath);
+        
+        // Check if file exists before streaming
+        if (!fs.existsSync(outputPath)) {
+            // Try to find the file with similar name (yt-dlp might have modified it)
+            const dir = path.dirname(outputPath);
+            const baseName = path.basename(outputPath, '.mp4');
+            console.log('File not found, searching in:', dir);
+            console.log('Looking for basename:', baseName.substring(0, 50));
+            
+            const allFiles = fs.readdirSync(dir);
+            // Look for merged file first, then any video file with our base name
+            const matchingFiles = allFiles
+                .filter(f => f.includes(baseName.substring(0, 50)) && (f.endsWith('.mp4') || f.endsWith('.mkv') || f.endsWith('.webm')))
+                .sort((a, b) => {
+                    // Prefer files without format IDs (merged files)
+                    const aHasFormat = /\.f\d+/.test(a);
+                    const bHasFormat = /\.f\d+/.test(b);
+                    if (aHasFormat && !bHasFormat) return 1;
+                    if (!aHasFormat && bHasFormat) return -1;
+                    return 0;
+                });
+            console.log('Matching files:', matchingFiles);
+            
+            if (matchingFiles.length > 0) {
+                outputPath = path.join(dir, matchingFiles[0]);
+                console.log('Found file:', outputPath);
+            } else {
+                console.error('Downloaded file not found at:', outputPath);
+                console.error('Recent files in temp dir:', allFiles.slice(-10));
+                return res.status(500).send('Download completed but file not found');
+            }
+        } else {
+            console.log('File found at expected location');
+        }
+
+        // Get file size for Content-Length header
+        const stat = fs.statSync(outputPath);
+        res.setHeader('Content-Length', stat.size);
+
+        // Stream the file to response
+        const fileStream = fs.createReadStream(outputPath);
+        fileStream.on('error', (err) => {
+            console.error('File stream error:', err);
+            if (!res.headersSent) res.status(500).send('Stream failed');
+        });
+
+        fileStream.pipe(res);
+
+        res.on('finish', () => {
+            // Cleanup after successful send
+            setTimeout(() => {
+                if (outputPath && fs.existsSync(outputPath)) {
+                    fs.unlink(outputPath, (e) => {
+                        if (e) console.log('Cleanup error:', e);
+                    });
+                }
+            }, 1000);
         });
 
     } catch (error) {
         console.error('Video download error:', error);
         if (!res.headersSent) res.status(500).send('Download failed: ' + error.message);
+        // Cleanup on error
+        if (outputPath && fs.existsSync(outputPath)) {
+            fs.unlink(outputPath, () => {});
+        }
     }
 });
 
-// Specific Audio Download route
+// Streaming Audio Download route with improved performance
 app.get('/api/download-audio', requireAuth, async (req, res) => {
-    const { url, quality, fileName } = req.query;
+    const { url, fileName } = req.query;
+    let outputPath = null;
+    
     try {
         if (!url) return res.status(400).send('URL is required');
 
-        const safeFileName = (fileName || 'audio').replace(/[^a-z0-9]/gi, '_');
-        const outputPath = path.join(downloadsDir, `${safeFileName}_${Date.now()}.mp3`);
+        const safeFileName = (fileName || 'audio').replace(/[^a-z0-9._-]/gi, '_').substring(0, 50);
+        outputPath = path.join(downloadsDir, `${safeFileName}_${Date.now()}.mp3`);
 
-        console.log(`Downloading audio: ${url}`);
+        console.log(`Downloading audio (best quality): ${url}`);
+
+        // Set headers before starting download
+        res.setHeader('Content-Type', 'audio/mpeg');
+        res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}.mp3"`);
+        res.setHeader('Cache-Control', 'no-cache');
 
         const args = [
             url,
             '-x',
             '--audio-format', 'mp3',
+            '--audio-quality', '0',  // Best quality
+            '--no-playlist',
+            '--no-warnings',
+            '--concurrent-fragments', '4',
+            '--buffer-size', '16K',
+            '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             '-o', outputPath
         ];
 
-        await ytDlp.execPromise(args);
+        const ytDlpProcess = ytDlp.exec(args);
 
-        res.download(outputPath, `${safeFileName}.mp3`, (err) => {
-            if (err) console.error('Download sending error:', err);
-            fs.unlink(outputPath, (e) => {
-                if (e) console.log('Cleanup error:', e);
+        ytDlpProcess.on('error', (error) => {
+            console.error('yt-dlp process error:', error);
+            if (!res.headersSent) {
+                res.status(500).send('Download failed');
+            }
+        });
+
+        await new Promise((resolve, reject) => {
+            ytDlpProcess.on('close', (code) => {
+                if (code === 0) resolve();
+                else reject(new Error(`Process exited with code ${code}`));
             });
+        });
+
+        // Check if file exists before streaming
+        if (!fs.existsSync(outputPath)) {
+            const dir = path.dirname(outputPath);
+            const baseName = path.basename(outputPath, '.mp3');
+            const files = fs.readdirSync(dir).filter(f => f.includes(baseName.substring(0, 50)));
+            
+            if (files.length > 0) {
+                outputPath = path.join(dir, files[0]);
+                console.log('Found file:', outputPath);
+            } else {
+                console.error('Downloaded file not found at:', outputPath);
+                return res.status(500).send('Download completed but file not found');
+            }
+        }
+
+        // Get file size for Content-Length header
+        const stat = fs.statSync(outputPath);
+        res.setHeader('Content-Length', stat.size);
+
+        // Stream the file to response
+        const fileStream = fs.createReadStream(outputPath);
+        fileStream.on('error', (err) => {
+            console.error('File stream error:', err);
+            if (!res.headersSent) res.status(500).send('Stream failed');
+        });
+
+        fileStream.pipe(res);
+
+        res.on('finish', () => {
+            // Cleanup after successful send
+            setTimeout(() => {
+                if (outputPath && fs.existsSync(outputPath)) {
+                    fs.unlink(outputPath, (e) => {
+                        if (e) console.log('Cleanup error:', e);
+                    });
+                }
+            }, 1000);
         });
 
     } catch (error) {
         console.error('Audio download error:', error);
         if (!res.headersSent) res.status(500).send('Download failed: ' + error.message);
+        // Cleanup on error
+        if (outputPath && fs.existsSync(outputPath)) {
+            fs.unlink(outputPath, () => {});
+        }
     }
 });
 
-// Facebook Download Route
+// Facebook Download Route with streaming
 app.get('/api/download/facebook', requireAuth, async (req, res) => {
     const { url } = req.query;
+    let outputPath = null;
 
     try {
         if (!url) {
             return res.status(400).send('Invalid Facebook URL');
         }
 
-        const outputPath = path.join(downloadsDir, `facebook_${Date.now()}.mp4`);
+        outputPath = path.join(downloadsDir, `facebook_${Date.now()}.mp4`);
 
-        await ytDlp.execPromise([
+        // Set headers
+        res.setHeader('Content-Type', 'video/mp4');
+        res.setHeader('Content-Disposition', 'attachment; filename="facebook_video.mp4"');
+        res.setHeader('Cache-Control', 'no-cache');
+
+        const ytDlpProcess = ytDlp.exec([
             url,
             '-f', 'best',
+            '--no-warnings',
+            '--concurrent-fragments', '4',
+            '--buffer-size', '16K',
             '-o', outputPath
         ]);
 
-        const filename = 'facebook_video.mp4';
-        res.download(outputPath, filename, (err) => {
-            if (err) console.error('Download sending error:', err);
-            fs.unlink(outputPath, (e) => {
-                if (e) console.log('Cleanup error:', e);
+        await new Promise((resolve, reject) => {
+            ytDlpProcess.on('close', (code) => {
+                if (code === 0) resolve();
+                else reject(new Error(`Process exited with code ${code}`));
             });
+            ytDlpProcess.on('error', reject);
+        });
+
+        // Check if file exists
+        if (!fs.existsSync(outputPath)) {
+            const dir = path.dirname(outputPath);
+            const files = fs.readdirSync(dir).filter(f => f.startsWith('facebook_'));
+            if (files.length > 0) {
+                outputPath = path.join(dir, files[files.length - 1]);
+                console.log('Found file:', outputPath);
+            } else {
+                return res.status(500).send('Download completed but file not found');
+            }
+        }
+
+        const stat = fs.statSync(outputPath);
+        res.setHeader('Content-Length', stat.size);
+
+        const fileStream = fs.createReadStream(outputPath);
+        fileStream.pipe(res);
+
+        res.on('finish', () => {
+            setTimeout(() => {
+                if (outputPath && fs.existsSync(outputPath)) {
+                    fs.unlink(outputPath, (e) => {
+                        if (e) console.log('Cleanup error:', e);
+                    });
+                }
+            }, 1000);
         });
     } catch (error) {
         console.error('Facebook download error:', error);
         if (!res.headersSent) {
             res.status(500).send('Download failed: ' + error.message);
         }
+        if (outputPath && fs.existsSync(outputPath)) {
+            fs.unlink(outputPath, () => {});
+        }
     }
 });
 
-// Instagram Download Route
+// Instagram Download Route with streaming
 app.get('/api/download/instagram', requireAuth, async (req, res) => {
     const { url } = req.query;
+    let outputPath = null;
 
     try {
         if (!url) {
             return res.status(400).send('Invalid Instagram URL');
         }
 
-        const outputPath = path.join(downloadsDir, `instagram_${Date.now()}.mp4`);
+        outputPath = path.join(downloadsDir, `instagram_${Date.now()}.mp4`);
 
-        await ytDlp.execPromise([
+        // Set headers
+        res.setHeader('Content-Type', 'video/mp4');
+        res.setHeader('Content-Disposition', 'attachment; filename="instagram_media.mp4"');
+        res.setHeader('Cache-Control', 'no-cache');
+
+        const ytDlpProcess = ytDlp.exec([
             url,
             '-f', 'best',
+            '--no-warnings',
+            '--concurrent-fragments', '4',
+            '--buffer-size', '16K',
             '-o', outputPath
         ]);
 
-        const filename = 'instagram_media.mp4';
-        res.download(outputPath, filename, (err) => {
-            if (err) console.error('Download sending error:', err);
-            fs.unlink(outputPath, (e) => {
-                if (e) console.log('Cleanup error:', e);
+        await new Promise((resolve, reject) => {
+            ytDlpProcess.on('close', (code) => {
+                if (code === 0) resolve();
+                else reject(new Error(`Process exited with code ${code}`));
             });
+            ytDlpProcess.on('error', reject);
+        });
+
+        // Check if file exists
+        if (!fs.existsSync(outputPath)) {
+            const dir = path.dirname(outputPath);
+            const files = fs.readdirSync(dir).filter(f => f.startsWith('instagram_'));
+            if (files.length > 0) {
+                outputPath = path.join(dir, files[files.length - 1]);
+                console.log('Found file:', outputPath);
+            } else {
+                return res.status(500).send('Download completed but file not found');
+            }
+        }
+
+        const stat = fs.statSync(outputPath);
+        res.setHeader('Content-Length', stat.size);
+
+        const fileStream = fs.createReadStream(outputPath);
+        fileStream.pipe(res);
+
+        res.on('finish', () => {
+            setTimeout(() => {
+                if (outputPath && fs.existsSync(outputPath)) {
+                    fs.unlink(outputPath, (e) => {
+                        if (e) console.log('Cleanup error:', e);
+                    });
+                }
+            }, 1000);
         });
     } catch (error) {
         console.error('Instagram download error:', error);
         if (!res.headersSent) {
             res.status(500).send('Download failed: ' + error.message);
         }
+        if (outputPath && fs.existsSync(outputPath)) {
+            fs.unlink(outputPath, () => {});
+        }
     }
 });
 
-// Spotify Download Route
+// Spotify Download Route with streaming
 app.get('/api/download/spotify', requireAuth, async (req, res) => {
     const { url } = req.query;
+    let outputPath = null;
 
     try {
         if (!url) {
             return res.status(400).send('Invalid Spotify URL');
         }
 
-        const outputPath = path.join(downloadsDir, `spotify_${Date.now()}.mp3`);
+        outputPath = path.join(downloadsDir, `spotify_${Date.now()}.mp3`);
 
-        await ytDlp.execPromise([
+        // Set headers
+        res.setHeader('Content-Type', 'audio/mpeg');
+        res.setHeader('Content-Disposition', 'attachment; filename="spotify_audio.mp3"');
+        res.setHeader('Cache-Control', 'no-cache');
+
+        const ytDlpProcess = ytDlp.exec([
             url,
             '-x',
             '--audio-format', 'mp3',
+            '--audio-quality', '0',
+            '--no-warnings',
+            '--concurrent-fragments', '4',
+            '--buffer-size', '16K',
             '-o', outputPath
         ]);
 
-        const filename = 'spotify_audio.mp3';
-        res.download(outputPath, filename, (err) => {
-            if (err) console.error('Download sending error:', err);
-            fs.unlink(outputPath, (e) => {
-                if (e) console.log('Cleanup error:', e);
+        await new Promise((resolve, reject) => {
+            ytDlpProcess.on('close', (code) => {
+                if (code === 0) resolve();
+                else reject(new Error(`Process exited with code ${code}`));
             });
+            ytDlpProcess.on('error', reject);
+        });
+
+        // Check if file exists
+        if (!fs.existsSync(outputPath)) {
+            const dir = path.dirname(outputPath);
+            const files = fs.readdirSync(dir).filter(f => f.startsWith('spotify_'));
+            if (files.length > 0) {
+                outputPath = path.join(dir, files[files.length - 1]);
+                console.log('Found file:', outputPath);
+            } else {
+                return res.status(500).send('Download completed but file not found');
+            }
+        }
+
+        const stat = fs.statSync(outputPath);
+        res.setHeader('Content-Length', stat.size);
+
+        const fileStream = fs.createReadStream(outputPath);
+        fileStream.pipe(res);
+
+        res.on('finish', () => {
+            setTimeout(() => {
+                if (outputPath && fs.existsSync(outputPath)) {
+                    fs.unlink(outputPath, (e) => {
+                        if (e) console.log('Cleanup error:', e);
+                    });
+                }
+            }, 1000);
         });
     } catch (error) {
         console.error('Spotify download error:', error);
         if (!res.headersSent) {
             res.status(500).send('Download failed: ' + error.message);
+        }
+        if (outputPath && fs.existsSync(outputPath)) {
+            fs.unlink(outputPath, () => {});
         }
     }
 });
@@ -377,4 +704,9 @@ app.use((err, req, res, next) => {
 // Start server
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
+    console.log('Optimizations enabled:');
+    console.log('- File streaming for faster downloads');
+    console.log('- Concurrent connection handling');
+    console.log('- Automatic cleanup of temporary files');
+    console.log('- Enhanced error handling');
 });

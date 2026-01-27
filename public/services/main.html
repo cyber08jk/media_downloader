@@ -347,55 +347,80 @@
           </div>
         `;
 
-        // Logic to refine labels and filter
-        const musicFormats = [];
-        const videoFormats = [];
-
-        // Track seen resolutions to avoid duplicates in list
-        const seenRes = new Set();
-
-        info.formats.forEach(f => {
-          let q = (f.quality || '').toString().toUpperCase();
-          if (f.hasVideo) {
-            // Only take high-res formats once
-            if (!seenRes.has(q)) {
-              videoFormats.push({ ...f, displayQuality: q });
-              seenRes.add(q);
-            }
-          } else {
-            // Audio bitrates
-            if (!seenRes.has(q)) {
-              musicFormats.push({ ...f, displayQuality: q });
-              seenRes.add(q);
-            }
-          }
-        });
-
-        const sortedMusic = musicFormats.sort((a, b) => (b.filesize || 0) - (a.filesize || 0)).slice(0, 4);
-        const sortedVideo = videoFormats.sort((a, b) => {
-          let qa = parseInt(a.displayQuality) || 0;
-          let qb = parseInt(b.displayQuality) || 0;
-          return qb - qa;
-        });
-
+        // Display simple audio/video options
         let html = '';
 
-        if (sortedMusic.length > 0) {
-          html += `
-            <div class="format-group">
-              <div class="group-header music"><i class="fas fa-music"></i> Music</div>
-              ${sortedMusic.map(f => renderFormatRow(f, 'MP3')).join('')}
-            </div>
-          `;
-        }
+        // Check if we have the new simplified format
+        if (info.formats && info.formats.length > 0 && info.formats[0].type) {
+          // New simplified format
+          info.formats.forEach(format => {
+            const icon = format.type === 'audio' ? 'fa-music' : 'fa-video';
+            const badge = format.type === 'audio' ? 'MP3' : 'MP4';
+            const groupClass = format.type === 'audio' ? 'music' : '';
+            
+            html += `
+              <div class="format-group">
+                <div class="group-header ${groupClass}"><i class="fas ${icon}"></i> ${format.label}</div>
+                <div class="format-row">
+                  <div class="format-info">
+                    <span class="format-badge">${badge}</span>
+                    <span class="quality-text">${format.description}</span>
+                  </div>
+                  <div class="dl-btn-container">
+                    <div class="fast-badge"><i class="fas fa-bolt"></i> FAST</div>
+                    <button class="dl-btn-list" onclick="triggerDownload('${format.type}')">
+                      <i class="fas fa-download"></i> Download
+                    </button>
+                  </div>
+                </div>
+              </div>
+            `;
+          });
+        } else {
+          // Old format structure (fallback)
+          const musicFormats = [];
+          const videoFormats = [];
+          const seenRes = new Set();
 
-        if (sortedVideo.length > 0) {
-          html += `
-            <div class="format-group">
-              <div class="group-header"><i class="fas fa-video"></i> Video</div>
-              ${sortedVideo.map(f => renderFormatRow(f, 'MP4')).join('')}
-            </div>
-          `;
+          info.formats.forEach(f => {
+            let q = (f.quality || '').toString().toUpperCase();
+            if (f.hasVideo) {
+              if (!seenRes.has(q)) {
+                videoFormats.push({ ...f, displayQuality: q });
+                seenRes.add(q);
+              }
+            } else {
+              if (!seenRes.has(q)) {
+                musicFormats.push({ ...f, displayQuality: q });
+                seenRes.add(q);
+              }
+            }
+          });
+
+          const sortedMusic = musicFormats.sort((a, b) => (b.filesize || 0) - (a.filesize || 0)).slice(0, 4);
+          const sortedVideo = videoFormats.sort((a, b) => {
+            let qa = parseInt(a.displayQuality) || 0;
+            let qb = parseInt(b.displayQuality) || 0;
+            return qb - qa;
+          });
+
+          if (sortedMusic.length > 0) {
+            html += `
+              <div class="format-group">
+                <div class="group-header music"><i class="fas fa-music"></i> Music</div>
+                ${sortedMusic.map(f => renderFormatRow(f, 'MP3')).join('')}
+              </div>
+            `;
+          }
+
+          if (sortedVideo.length > 0) {
+            html += `
+              <div class="format-group">
+                <div class="group-header"><i class="fas fa-video"></i> Video</div>
+                ${sortedVideo.map(f => renderFormatRow(f, 'MP4')).join('')}
+              </div>
+            `;
+          }
         }
 
         formatListDiv.innerHTML = html;
@@ -429,13 +454,23 @@
       `;
     }
 
-    function triggerDownload(itag, isAudio) {
+    function triggerDownload(formatTypeOrItag, isAudio) {
       if (!videoInfo) return;
       const fileName = document.getElementById('fileName').value.trim() || videoInfo.title;
-      const endpoint = isAudio ? '/api/download-audio' : '/api/download-video';
-      const data = { url: videoInfo.url, quality: itag, fileName };
-      const params = new URLSearchParams(data).toString();
-      window.location.href = `${endpoint}?${params}`;
+      
+      // Check if using new simplified format (formatTypeOrItag is 'audio' or 'video')
+      if (formatTypeOrItag === 'audio' || formatTypeOrItag === 'video') {
+        const endpoint = formatTypeOrItag === 'audio' ? '/api/download-audio' : '/api/download-video';
+        const data = { url: videoInfo.url, format: formatTypeOrItag, fileName };
+        const params = new URLSearchParams(data).toString();
+        window.location.href = `${endpoint}?${params}`;
+      } else {
+        // Old format with itag
+        const endpoint = isAudio ? '/api/download-audio' : '/api/download-video';
+        const data = { url: videoInfo.url, quality: formatTypeOrItag, fileName };
+        const params = new URLSearchParams(data).toString();
+        window.location.href = `${endpoint}?${params}`;
+      }
     }
   </script>
 </body>
