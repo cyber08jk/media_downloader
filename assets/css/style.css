@@ -968,30 +968,33 @@ Home Section style
 }
 .main_home .slick-dots li button::before {
     font-family: slick;
-    font-size: 8px;
-    line-height: 7px;
+    font-size: 10px;
+    line-height: 8px;
     position: absolute;
     top: 0px;
     left: 0px;
-    width: 10px;
-    height: 10px;
+    width: 14px;
+    height: 14px;
     content: "";
     text-align: center;
-    opacity: 0.9;
+    opacity: 0.6;
     color: white;
-    border:1px solid #fff;
+    border: 2px solid #fff;
     border-radius: 50%;
     -webkit-font-smoothing: antialiased;
-    background-color: #fff;
+    background-color: transparent;
+    transition: all 0.3s ease;
 }
 .main_home .slick-dots li {
-    width: 10px;
-    height: 10px;
-    margin: 0 5px;
+    width: 14px;
+    height: 14px;
+    margin: 0 8px;
 }
 .main_home .slick-dots li.slick-active button:before{
     opacity: 1;
     background-color: #00a885;
+    border-color: #00a885;
+    transform: scale(1.2);
 }
 .main_home .slick-dots{
     bottom: -80px;
