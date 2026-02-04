@@ -45,38 +45,44 @@ nav.navbar.bootsnav{
     -webkit-border-radius: 0px;
     -o-border-radius: 0px;
     border-radius: 0px;
-    background-color: #fff;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.98) 100%);
     border: none;
-    border-bottom: solid 3px #00a885;
+    border-bottom: solid 4px #00a885;
     z-index: 9;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-    padding: 8px 0;
+    box-shadow: 0 2px 15px rgba(0, 168, 133, 0.15);
+    padding: 12px 0;
 }
 
 nav.navbar.bootsnav ul.nav > li > a{
-    color: #333333;
+    color: #1a1a1a;
     background-color: transparent !important;
-    font-size: 16px;
-    font-weight: 600;
-    padding: 15px 20px !important;
+    font-size: 15px;
+    font-weight: 700;
+    padding: 18px 22px !important;
     transition: all 0.3s ease;
     position: relative;
+    letter-spacing: 0.5px;
 }
 
 nav.navbar.bootsnav ul.nav > li > a:after {
     content: '';
     position: absolute;
-    bottom: 5px;
-    left: 20px;
-    right: 20px;
-    height: 2px;
-    background: #00a885;
+    bottom: 8px;
+    left: 22px;
+    right: 22px;
+    height: 3px;
+    background: linear-gradient(90deg, #00a885, #1DB954);
     transform: scaleX(0);
     transition: transform 0.3s ease;
+    border-radius: 2px;
 }
 
 nav.navbar.bootsnav ul.nav > li > a:hover:after {
     transform: scaleX(1);
+}
+
+nav.navbar.bootsnav ul.nav > li > a:hover {
+    color: #00a885 !important;
 }
 
 nav.navbar.bootsnav ul.nav li.megamenu-fw > a:hover,

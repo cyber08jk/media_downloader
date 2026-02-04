@@ -890,12 +890,17 @@ Home Section style
 ==================*/
 
 .home{
-    background: url(../images/home-bg.jpg) no-repeat scroll  center center;
+    background: url(../images/home-bg.jpg) no-repeat scroll center top;
     background-size: cover;
     position: relative;
-    padding-top: 300px;
-    padding-bottom: 190px;
-    width:100%;
+    padding-top: 120px;
+    padding-bottom: 80px;
+    width: 100%;
+    background-attachment: fixed;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 .main_home .home_text h2{
     font-size:36px;
@@ -937,7 +942,7 @@ Home Section style
     background-color: #00a885;
 }
 .main_home .slick-dots{
-    bottom: -200px;
+    bottom: -80px;
 }
 
 .work_container .slick-arrow ,
