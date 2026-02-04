@@ -111,6 +111,33 @@ nav.navbar.bootsnav .navbar-toggle:hover {
     color: #fff;
 }
 
+/* Dropdown Menu Styling */
+nav.navbar.bootsnav ul.dropdown-menu {
+    background-color: rgba(50, 50, 50, 0.98);
+    border: 1px solid #00a885;
+    border-radius: 4px;
+    padding: 10px 0;
+    margin-top: 5px;
+}
+
+nav.navbar.bootsnav ul.dropdown-menu > li > a {
+    color: #ffffff;
+    padding: 12px 20px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+nav.navbar.bootsnav ul.dropdown-menu > li > a:hover {
+    background-color: rgba(0, 168, 133, 0.2);
+    color: #00a885;
+    padding-left: 25px;
+}
+
+nav.navbar.bootsnav ul.dropdown-menu > li > a i {
+    margin-right: 10px;
+    color: #00a885;
+}
+
 nav.navbar.bootsnav ul.nav .dropdown-menu .dropdown-menu{
     top: 0;
     left: 100%;
@@ -1048,7 +1075,7 @@ body.on-side .wrap-sticky nav.navbar.bootsnav.sticked{
         display: inline-block;
         float: left;
         margin-right: -200px;
-        margin-top: 10px;
+        margin-top: 5px;
     }
     
     nav.navbar.bootsnav .navbar-collapse {
@@ -1095,10 +1122,13 @@ body.on-side .wrap-sticky nav.navbar.bootsnav.sticked{
     nav.navbar.bootsnav .navbar-nav > li > a{
         display: block;
         width: 100%;
-        border-bottom: solid 1px #e0e0e0;
-        padding: 10px 0;
-        border-top: solid 1px #e0e0e0;
+        border-bottom: solid 1px #333333;
+        padding: 16px 0;
+        border-top: solid 1px #333333;
         margin-bottom: -1px;
+        color: #ffffff;
+        font-weight: 700;
+        font-size: 16px;
     }
     
     nav.navbar.bootsnav .navbar-nav > li:first-child > a{
@@ -1137,14 +1167,21 @@ body.on-side .wrap-sticky nav.navbar.bootsnav.sticked{
     nav.navbar.bootsnav ul.nav li.dropdown ul.dropdown-menu  > li > a{
         display: block;
         width: 100%;
-        border-bottom: solid 1px #e0e0e0;
-        padding: 10px 0;
-        color: #6f6f6f;
+        border-bottom: solid 1px #333333;
+        padding: 14px 20px;
+        color: #ffffff;
+        font-weight: 500;
     }
     
     nav.navbar.bootsnav ul.nav ul.dropdown-menu li a:hover,
     nav.navbar.bootsnav ul.nav ul.dropdown-menu li a:focus{
-        background-color: transparent;
+        background-color: rgba(0, 168, 133, 0.3);
+        padding-left: 25px;
+    }
+    
+    nav.navbar.bootsnav ul.nav li.dropdown ul.dropdown-menu > li > a i {
+        margin-right: 10px;
+        color: #00a885;
     }
     
     nav.navbar.bootsnav ul.nav ul.dropdown-menu ul.dropdown-menu{
@@ -1347,18 +1384,18 @@ body.on-side .wrap-sticky nav.navbar.bootsnav.sticked{
         overflow-y: auto !important;
         overflow-x: hidden !important;
         display: block;
-        background: #fff;
+        background: linear-gradient(180deg, rgba(30, 30, 30, 0.98) 0%, rgba(40, 40, 40, 0.98) 100%);
         z-index: 99;
-        width: 280px;
+        width: 100%;
         height: 100% !important;
-        left: -280px;
+        left: -100%;
         top: 0;
         padding: 0;
-        -webkit-transition: all 0.3s ease-in-out;
-        -moz-transition: all 0.3s ease-in-out;
-        -o-transition: all 0.3s ease-in-out;
-        -ms-transition: all 0.3s ease-in-out;
-        transition: all 0.3s ease-in-out;
+        -webkit-transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        -moz-transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        -o-transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        -ms-transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     }
     
     nav.navbar.bootsnav.navbar-mobile .navbar-collapse.in{
@@ -1366,13 +1403,14 @@ body.on-side .wrap-sticky nav.navbar.bootsnav.sticked{
     }
     
     nav.navbar.bootsnav.navbar-mobile ul.nav{
-        width: 293px;
+        width: 100%;
         padding-right: 0;
-        padding-left: 15px;
+        padding-left: 0;
     }
     
     nav.navbar.bootsnav.navbar-mobile ul.nav > li > a{
-        padding: 15px 15px;
+        padding: 18px 20px;
+        color: #ffffff;
     }
     
     nav.navbar.bootsnav.navbar-mobile ul.nav ul.dropdown-menu > li > a{
