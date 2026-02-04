@@ -234,11 +234,12 @@ app.get('/api/download-video', requireAuth, async (req, res) => {
         outputPath = path.join(downloadsDir, `${safeFileName}_${timestamp}.%(ext)s`);
         const expectedPath = path.join(downloadsDir, `${safeFileName}_${timestamp}.mp4`);
 
-        // Auto-select best quality based on format type
+        // Auto-select best quality based on format type - force video WITH audio
         const formatArg = format === 'audio' ? 'bestaudio/best' : 'bestvideo+bestaudio/best';
         
         console.log(`Downloading: ${url}`);
-        console.log(`Format: ${format || 'video'} (${formatArg})`);
+        console.log(`Format requested: ${format || 'video'}`);
+        console.log(`yt-dlp format: ${formatArg}`);
         console.log(`Expected output: ${expectedPath}`);
 
         // Set headers before starting download
@@ -247,23 +248,26 @@ app.get('/api/download-video', requireAuth, async (req, res) => {
         res.setHeader('Cache-Control', 'no-cache');
 
         // Use streaming for faster downloads
-        const ytDlpProcess = ytDlp.exec([
+        const ytDlpArgs = [
             url,
             '-f', formatArg,
             '--merge-output-format', 'mp4',
             '--no-playlist',
             '--no-warnings',
             '--no-mtime',
-            '--concurrent-fragments', '4',
-            '--buffer-size', '16K',
-            '--http-chunk-size', '10M',
-            '--remux-video', 'mp4',
-            '--no-keep-fragments',
             '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             '--referer', url,
             '--newline',
             '-o', outputPath
-        ]);
+        ];
+        
+        // Add audio-specific flags for video downloads
+        if (format !== 'audio') {
+            ytDlpArgs.push('--audio-format', 'best');
+            ytDlpArgs.push('--postprocessor-args', 'ffmpeg:-c:a aac -c:v copy');
+        }
+        
+        const ytDlpProcess = ytDlp.exec(ytDlpArgs);
         
         if (!ytDlpProcess) {
             console.error('Failed to start yt-dlp process');
@@ -496,10 +500,10 @@ app.get('/api/download/facebook', requireAuth, async (req, res) => {
 
         const ytDlpProcess = ytDlp.exec([
             url,
-            '-f', 'best',
+            '-f', 'bestvideo+bestaudio/best',
+            '--merge-output-format', 'mp4',
             '--no-warnings',
-            '--concurrent-fragments', '4',
-            '--buffer-size', '16K',
+            '--audio-format', 'best',
             '-o', outputPath
         ]);
 
@@ -568,10 +572,10 @@ app.get('/api/download/instagram', requireAuth, async (req, res) => {
 
         const ytDlpProcess = ytDlp.exec([
             url,
-            '-f', 'best',
+            '-f', 'bestvideo+bestaudio/best',
+            '--merge-output-format', 'mp4',
             '--no-warnings',
-            '--concurrent-fragments', '4',
-            '--buffer-size', '16K',
+            '--audio-format', 'best',
             '-o', outputPath
         ]);
 

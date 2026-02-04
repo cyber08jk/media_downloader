@@ -839,33 +839,49 @@ Nav Menu style
 ==================*/
 
 .navbar-brand {
-    padding: 25px 15px;
+    padding: 15px 20px !important;
 }
 .navbar-brand > img {
     display: block;
-    width: 80%;
+    width: 100%;
+    max-width: 200px;
+    height: auto;
 }
 
 .navbar-callus li a{
-    font-size:14px;
-    padding: 10px;
-    color:#444444;
+    font-size: 16px;
+    padding: 15px 12px;
+    color: #333333;
     display: inline-block;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+.navbar-callus li a:hover {
+    color: #00a885;
 }
 .navbar-callus li a i{
-    font-size:13px;
-    color:#1abc9c;
-    margin-right: 5px;
+    font-size: 14px;
+    color: #00a885;
+    margin-right: 8px;
 }
 .navbar-socail li a{
-    font-size:16px;
-    padding: 10px;
-    color:#aaaaaa;
+    font-size: 18px;
+    padding: 12px 15px;
+    color: #999999;
     display: inline-block;
+    border-radius: 50%;
+    width: 45px;
+    height: 45px;
+    line-height: 18px;
+    text-align: center;
+    transition: all 0.3s ease;
+    background: rgba(0, 168, 133, 0);
 }
 .navbar-socail li a:hover{
-    background-color: #3765a3;
-    color:#fff;
+    background-color: #00a885;
+    color: #fff;
+    transform: translateY(-3px);
+    box-shadow: 0 4px 8px rgba(0, 168, 133, 0.3);
 }
 
 
