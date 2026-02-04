@@ -902,6 +902,17 @@ Home Section style
     align-items: center;
     justify-content: center;
 }
+
+.home::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(0, 168, 133, 0.2) 0%, rgba(24, 119, 242, 0.15) 50%, rgba(0, 0, 0, 0.1) 100%);
+    z-index: 1;
+}
 .main_home .home_text h2{
     font-size:36px;
     font-weight: 400;
