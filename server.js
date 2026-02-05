@@ -172,10 +172,41 @@ app.post('/api/register', (req, res) => {
 });
 
 // Logout route
-app.post('/api/logout', (req, res) => {
-    req.session.destroy();
-    res.json({ success: true });
-});
+// Helper function to handle online downloads via third-party services
+function handleOnlineDownload(res, url, format, fileName, mediaType) {
+    try {
+        // Encode URL for services
+        const encodedUrl = encodeURIComponent(url);
+        
+        // Different services for different needs
+        let downloadUrl;
+        
+        if (mediaType === 'audio') {
+            // Audio download services (MP3)
+            downloadUrl = `https://y2mate.com/en/youtube-to-mp3?url=${encodedUrl}`;
+        } else {
+            // Video download services
+            // Using y2mate as primary (most reliable)
+            downloadUrl = `https://y2mate.com/en/youtube-to-mp4?url=${encodedUrl}`;
+        }
+        
+        // Return the download service URL for the user
+        // The browser will open this in a new tab/window
+        res.json({
+            success: true,
+            message: 'Opening download service in new tab...',
+            downloadUrl: downloadUrl,
+            note: 'Using online download service. You may need to follow additional steps on the download site.'
+        });
+        
+    } catch (error) {
+        console.error('Online download error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Could not generate download link. Please try: 1) Use local app (npm start) 2) Visit y2mate.com manually'
+        });
+    }
+}
 
 // Check login status route
 app.get('/api/check-login', (req, res) => {
@@ -343,10 +374,8 @@ app.get('/api/download-video', requireAuth, async (req, res) => {
     
     // Check if yt-dlp is available (only local)
     if (!ytDlpReady || !ytDlp) {
-        return res.status(503).json({ 
-            success: false, 
-            message: 'Downloads require local installation. Download/clone this project and run: npm start' 
-        });
+        // Fallback: Use online download services for Vercel
+        return handleOnlineDownload(res, url, format, fileName, 'video');
     }
     
     let outputPath = null;
@@ -523,10 +552,8 @@ app.get('/api/download-audio', requireAuth, async (req, res) => {
     
     // Check if yt-dlp is available (only local)
     if (!ytDlpReady || !ytDlp) {
-        return res.status(503).json({ 
-            success: false, 
-            message: 'Downloads require local installation. Download/clone this project and run: npm start' 
-        });
+        // Fallback: Use online download services for Vercel
+        return handleOnlineDownload(res, url, 'audio', fileName, 'audio');
     }
     
     let outputPath = null;
