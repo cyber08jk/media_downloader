@@ -19,8 +19,10 @@ app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 
 // Initialize yt-dlp and download binary if needed
-let ytDlp;
-(async () => {
+let ytDlp = null;
+let ytDlpReady = false;
+
+const initYtDlp = async () => {
     try {
         // Check for local binary first
         const binaryPath = path.join(__dirname, 'yt-dlp.exe');
@@ -33,17 +35,24 @@ let ytDlp;
             await ytDlp.getVersion();
             console.log('yt-dlp binary found in PATH');
         }
+        ytDlpReady = true;
+        console.log('✅ yt-dlp initialized successfully');
     } catch (error) {
-        console.log('yt-dlp binary not found, downloading...');
+        console.log('⚠️  yt-dlp binary not found, attempting download...');
         try {
             await YTDlpWrap.downloadFromGithub();
-            ytDlp = new YTDlpWrap(path.join(__dirname, 'yt-dlp.exe')); // Use the downloaded binary path
-            console.log('yt-dlp binary downloaded successfully');
+            ytDlp = new YTDlpWrap(path.join(__dirname, 'yt-dlp.exe'));
+            ytDlpReady = true;
+            console.log('✅ yt-dlp binary downloaded and initialized successfully');
         } catch (downloadError) {
-            console.error('Failed to download yt-dlp:', downloadError);
+            console.error('❌ Failed to initialize yt-dlp:', downloadError.message);
+            ytDlpReady = false;
         }
     }
-})();
+};
+
+// Start initialization immediately
+initYtDlp();
 
 // Use system temp directory for downloads to avoid cluttering project folder
 const downloadsDir = os.tmpdir();
@@ -67,6 +76,17 @@ app.use(session({
 
 // Authentication middleware
 function requireAuth(req, res, next) {
+    next();
+}
+
+// Middleware to ensure ytDlp is initialized
+function requireYtDlp(req, res, next) {
+    if (!ytDlpReady || !ytDlp) {
+        return res.status(503).json({ 
+            success: false, 
+            message: 'Download service is initializing. Please try again in a moment.' 
+        });
+    }
     next();
 }
 
@@ -168,7 +188,7 @@ app.get('/api/check-login', (req, res) => {
 
 // Media download routes
 // Video Info route
-app.post('/api/video-info', requireAuth, async (req, res) => {
+app.post('/api/video-info', requireAuth, requireYtDlp, async (req, res) => {
     const { url } = req.body;
     try {
         if (!url) {
@@ -245,7 +265,7 @@ app.post('/api/video-info', requireAuth, async (req, res) => {
 });
 
 // Streaming Video Download route with improved performance
-app.get('/api/download-video', requireAuth, async (req, res) => {
+app.get('/api/download-video', requireAuth, requireYtDlp, async (req, res) => {
     const { url, format, fileName } = req.query;
     let outputPath = null;
     
@@ -416,7 +436,7 @@ app.get('/api/download-video', requireAuth, async (req, res) => {
 });
 
 // Streaming Audio Download route with improved performance
-app.get('/api/download-audio', requireAuth, async (req, res) => {
+app.get('/api/download-audio', requireAuth, requireYtDlp, async (req, res) => {
     const { url, fileName } = req.query;
     let outputPath = null;
     
@@ -512,7 +532,7 @@ app.get('/api/download-audio', requireAuth, async (req, res) => {
 });
 
 // Facebook Download Route with streaming
-app.get('/api/download/facebook', requireAuth, async (req, res) => {
+app.get('/api/download/facebook', requireAuth, requireYtDlp, async (req, res) => {
     const { url } = req.query;
     let outputPath = null;
 
@@ -584,7 +604,7 @@ app.get('/api/download/facebook', requireAuth, async (req, res) => {
 });
 
 // Instagram Download Route with streaming
-app.get('/api/download/instagram', requireAuth, async (req, res) => {
+app.get('/api/download/instagram', requireAuth, requireYtDlp, async (req, res) => {
     const { url } = req.query;
     let outputPath = null;
 
@@ -656,7 +676,7 @@ app.get('/api/download/instagram', requireAuth, async (req, res) => {
 });
 
 // Spotify Download Route with streaming
-app.get('/api/download/spotify', requireAuth, async (req, res) => {
+app.get('/api/download/spotify', requireAuth, requireYtDlp, async (req, res) => {
     const { url } = req.query;
     let outputPath = null;
 
