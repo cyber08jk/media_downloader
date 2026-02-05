@@ -182,7 +182,10 @@ app.post('/api/video-info', requireAuth, async (req, res) => {
             '--no-playlist',
             '--no-warnings',
             '--skip-download',
-            '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            '--socket-timeout', '30',
+            '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            '--referer', 'https://www.youtube.com',
+            '--extractor-args', 'youtube:skip=dash,hls'
         ]);
 
         const info = JSON.parse(jsonOutput);
@@ -213,10 +216,30 @@ app.post('/api/video-info', requireAuth, async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching video info:', error);
-        const errorMsg = error.message.includes('Video unavailable') ? 'Video is unavailable or private' :
-                        error.message.includes('Sign in') ? 'Video requires sign-in (age-restricted or members-only)' :
-                        error.message.includes('not available') ? 'Video is not available in your region' :
-                        'Failed to fetch video info - video may be unavailable or restricted';
+        console.error('Error details:', {
+            message: error.message,
+            code: error.code,
+            stderr: error.stderr,
+            stdout: error.stdout
+        });
+        
+        // Better error detection
+        let errorMsg = 'Failed to fetch video info - video may be unavailable or restricted';
+        
+        if (error.message.includes('Video unavailable') || error.message.includes('is not available')) {
+            errorMsg = 'Video is unavailable or private';
+        } else if (error.message.includes('Sign in') || error.message.includes('age-restricted')) {
+            errorMsg = 'Video requires sign-in (age-restricted or members-only)';
+        } else if (error.message.includes('not available') || error.message.includes('region')) {
+            errorMsg = 'Video is not available in your region';
+        } else if (error.message.includes('Invalid URL') || error.message.includes('No such file')) {
+            errorMsg = 'Invalid URL format';
+        } else if (error.message.includes('No space') || error.message.includes('disk')) {
+            errorMsg = 'Not enough disk space available';
+        } else if (error.message.includes('ECONNREFUSED') || error.message.includes('ETIMEDOUT')) {
+            errorMsg = 'Network connection error - check your internet';
+        }
+        
         res.status(500).json({ success: false, message: errorMsg });
     }
 });
@@ -302,13 +325,20 @@ app.get('/api/download-video', requireAuth, async (req, res) => {
         await new Promise((resolve, reject) => {
             ytDlpProcess.on('close', (code) => {
                 console.log(`yt-dlp process exited with code: ${code}`);
+                console.log(`Download stderr: ${errorLog}`);
                 if (code === 0) {
                     resolve();
                 } else {
-                    const errorMsg = errorLog.includes('Video unavailable') ? 'Video is unavailable or private' :
-                                   errorLog.includes('Sign in') ? 'Video requires authentication' :
-                                   errorLog.includes('age') ? 'Video is age-restricted' :
-                                   'Download failed - video may be unavailable or restricted';
+                    let errorMsg = 'Download failed - video may be unavailable or restricted';
+                    if (errorLog.includes('Video unavailable') || errorLog.includes('is not available')) {
+                        errorMsg = 'Video is unavailable or private';
+                    } else if (errorLog.includes('Sign in') || errorLog.includes('age-restricted')) {
+                        errorMsg = 'Video requires authentication (age-restricted or members-only)';
+                    } else if (errorLog.includes('403')) {
+                        errorMsg = 'Access forbidden - video may be blocked';
+                    } else if (errorLog.includes('No space')) {
+                        errorMsg = 'Not enough disk space';
+                    }
                     reject(new Error(errorMsg));
                 }
             });
