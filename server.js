@@ -187,7 +187,7 @@ app.get('/api/check-login', (req, res) => {
 });
 
 // Media download routes
-// Video Info route
+// Video Info route - works online and locally
 app.post('/api/video-info', requireAuth, async (req, res) => {
     const { url } = req.body;
     try {
@@ -197,38 +197,95 @@ app.post('/api/video-info', requireAuth, async (req, res) => {
 
         console.log('Fetching video info for:', url);
         
-        // Check if running on Vercel (serverless) - check multiple ways
-        const isVercel = process.env.VERCEL || process.env.NOW_REGION || process.env.VERCEL_ENV;
-        if (isVercel) {
-            return res.status(503).json({
-                success: false,
-                message: 'Video info fetching is only available when running locally. This web interface works on Vercel, but downloads require a local server.'
-            });
+        // Try local yt-dlp first
+        if (ytDlpReady && ytDlp) {
+            try {
+                const jsonOutput = await ytDlp.execPromise([
+                    url,
+                    '--dump-json',
+                    '--no-playlist',
+                    '--no-warnings',
+                    '--skip-download',
+                    '--socket-timeout', '30',
+                    '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    '--referer', 'https://www.youtube.com',
+                    '--extractor-args', 'youtube:skip=dash,hls'
+                ]);
+
+                const info = JSON.parse(jsonOutput);
+
+                // Simplified format selection
+                const formats = [
+                    {
+                        type: 'video',
+                        label: 'Video (Best Quality)',
+                        format: 'bestvideo+bestaudio/best',
+                        description: 'Highest quality video with audio'
+                    },
+                    {
+                        type: 'audio',
+                        label: 'Audio Only (Best Quality)',
+                        format: 'bestaudio/best',
+                        description: 'Highest quality audio only'
+                    }
+                ];
+
+                return res.json({
+                    title: info.title,
+                    thumbnail: info.thumbnail,
+                    duration: info.duration,
+                    formats: formats,
+                    url: url
+                });
+            } catch (error) {
+                console.log('yt-dlp failed, falling back to API:', error.message);
+                // Fall through to API fallback
+            }
         }
         
-        // Check if ytDlp is initialized
-        if (!ytDlpReady || !ytDlp) {
-            return res.status(503).json({
-                success: false,
-                message: 'Download service is initializing. Please try again in a moment.'
-            });
+        // Fallback: Use public API for metadata
+        console.log('Using fallback API for video info...');
+        const videoId = extractVideoId(url);
+        if (!videoId) {
+            return res.status(400).json({ success: false, message: 'Invalid YouTube URL' });
         }
-        
-        const jsonOutput = await ytDlp.execPromise([
-            url,
-            '--dump-json',
-            '--no-playlist',
-            '--no-warnings',
-            '--skip-download',
-            '--socket-timeout', '30',
-            '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            '--referer', 'https://www.youtube.com',
-            '--extractor-args', 'youtube:skip=dash,hls'
-        ]);
 
-        const info = JSON.parse(jsonOutput);
+        // Try noembed API (no key required)
+        try {
+            const apiUrl = `https://noembed.com/embed?url=${encodeURIComponent(url)}`;
+            const response = await fetch(apiUrl);
+            
+            if (response.ok) {
+                const data = await response.json();
+                
+                const formats = [
+                    {
+                        type: 'video',
+                        label: 'Video (Best Quality)',
+                        format: 'bestvideo+bestaudio/best',
+                        description: 'Highest quality video with audio'
+                    },
+                    {
+                        type: 'audio',
+                        label: 'Audio Only (Best Quality)',
+                        format: 'bestaudio/best',
+                        description: 'Highest quality audio only'
+                    }
+                ];
 
-        // Simplified format selection - only audio or video with auto-best quality
+                return res.json({
+                    title: data.title || 'Video',
+                    thumbnail: data.thumbnail_url || `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+                    duration: data.duration || 0,
+                    formats: formats,
+                    url: url
+                });
+            }
+        } catch (apiError) {
+            console.log('Noembed API failed:', apiError.message);
+        }
+
+        // Final fallback: basic YouTube thumbnail
         const formats = [
             {
                 type: 'video',
@@ -244,62 +301,51 @@ app.post('/api/video-info', requireAuth, async (req, res) => {
             }
         ];
 
-        res.json({
-            title: info.title,
-            thumbnail: info.thumbnail,
-            duration: info.duration,
+        return res.json({
+            title: 'Video',
+            thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+            duration: 0,
             formats: formats,
             url: url
         });
 
     } catch (error) {
         console.error('Error fetching video info:', error);
-        console.error('Error details:', {
-            message: error.message,
-            code: error.code,
-            stderr: error.stderr,
-            stdout: error.stdout
-        });
-        
-        // Better error detection
         let errorMsg = 'Failed to fetch video info - video may be unavailable or restricted';
         
         if (error.message.includes('Video unavailable') || error.message.includes('is not available')) {
             errorMsg = 'Video is unavailable or private';
         } else if (error.message.includes('Sign in') || error.message.includes('age-restricted')) {
             errorMsg = 'Video requires sign-in (age-restricted or members-only)';
-        } else if (error.message.includes('not available') || error.message.includes('region')) {
-            errorMsg = 'Video is not available in your region';
-        } else if (error.message.includes('Invalid URL') || error.message.includes('No such file')) {
-            errorMsg = 'Invalid URL format';
-        } else if (error.message.includes('No space') || error.message.includes('disk')) {
-            errorMsg = 'Not enough disk space available';
-        } else if (error.message.includes('ECONNREFUSED') || error.message.includes('ETIMEDOUT')) {
-            errorMsg = 'Network connection error - check your internet';
         }
         
         res.status(500).json({ success: false, message: errorMsg });
     }
 });
 
+// Helper function to extract YouTube video ID
+function extractVideoId(url) {
+    const patterns = [
+        /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/,
+        /youtube\.com\/shorts\/([^&\n?#]+)/
+    ];
+    
+    for (const pattern of patterns) {
+        const match = url.match(pattern);
+        if (match) return match[1];
+    }
+    return null;
+}
+
 // Streaming Video Download route with improved performance
 app.get('/api/download-video', requireAuth, async (req, res) => {
     const { url, format, fileName } = req.query;
     
-    // Check if running on Vercel (serverless)
-    const isVercel = process.env.VERCEL || process.env.NOW_REGION || process.env.VERCEL_ENV;
-    if (isVercel) {
-        return res.status(503).json({ 
-            success: false, 
-            message: 'Video downloads only work locally. Clone the repo and run: npm start' 
-        });
-    }
-    
-    // Check if ytDlp is initialized
+    // Check if yt-dlp is available (only local)
     if (!ytDlpReady || !ytDlp) {
         return res.status(503).json({ 
             success: false, 
-            message: 'Download service is initializing. Please try again in a moment.' 
+            message: 'Downloads require local installation. Download/clone this project and run: npm start' 
         });
     }
     
@@ -475,20 +521,11 @@ app.get('/api/download-video', requireAuth, async (req, res) => {
 app.get('/api/download-audio', requireAuth, async (req, res) => {
     const { url, fileName } = req.query;
     
-    // Check if running on Vercel (serverless)
-    const isVercel = process.env.VERCEL || process.env.NOW_REGION || process.env.VERCEL_ENV;
-    if (isVercel) {
-        return res.status(503).json({ 
-            success: false, 
-            message: 'Audio downloads only work locally. Clone the repo and run: npm start' 
-        });
-    }
-    
-    // Check if ytDlp is initialized
+    // Check if yt-dlp is available (only local)
     if (!ytDlpReady || !ytDlp) {
         return res.status(503).json({ 
             success: false, 
-            message: 'Download service is initializing. Please try again in a moment.' 
+            message: 'Downloads require local installation. Download/clone this project and run: npm start' 
         });
     }
     
@@ -610,20 +647,11 @@ app.get('/api/download-audio', requireAuth, async (req, res) => {
 app.get('/api/download/facebook', requireAuth, async (req, res) => {
     const { url } = req.query;
     
-    // Check if running on Vercel
-    const isVercel = process.env.VERCEL || process.env.NOW_REGION || process.env.VERCEL_ENV;
-    if (isVercel) {
-        return res.status(503).json({ 
-            success: false, 
-            message: 'Downloads only work locally. Clone the repo and run: npm start' 
-        });
-    }
-    
-    // Check if ytDlp is initialized
+    // Check if yt-dlp is available (only local)
     if (!ytDlpReady || !ytDlp) {
         return res.status(503).json({ 
             success: false, 
-            message: 'Download service is initializing. Please try again in a moment.' 
+            message: 'Downloads require local installation. Download/clone this project and run: npm start' 
         });
     }
     
@@ -700,20 +728,11 @@ app.get('/api/download/facebook', requireAuth, async (req, res) => {
 app.get('/api/download/instagram', requireAuth, async (req, res) => {
     const { url } = req.query;
     
-    // Check if running on Vercel
-    const isVercel = process.env.VERCEL || process.env.NOW_REGION || process.env.VERCEL_ENV;
-    if (isVercel) {
-        return res.status(503).json({ 
-            success: false, 
-            message: 'Downloads only work locally. Clone the repo and run: npm start' 
-        });
-    }
-    
-    // Check if ytDlp is initialized
+    // Check if yt-dlp is available (only local)
     if (!ytDlpReady || !ytDlp) {
         return res.status(503).json({ 
             success: false, 
-            message: 'Download service is initializing. Please try again in a moment.' 
+            message: 'Downloads require local installation. Download/clone this project and run: npm start' 
         });
     }
     
@@ -790,20 +809,11 @@ app.get('/api/download/instagram', requireAuth, async (req, res) => {
 app.get('/api/download/spotify', requireAuth, async (req, res) => {
     const { url } = req.query;
     
-    // Check if running on Vercel
-    const isVercel = process.env.VERCEL || process.env.NOW_REGION || process.env.VERCEL_ENV;
-    if (isVercel) {
-        return res.status(503).json({ 
-            success: false, 
-            message: 'Downloads only work locally. Clone the repo and run: npm start' 
-        });
-    }
-    
-    // Check if ytDlp is initialized
+    // Check if yt-dlp is available (only local)
     if (!ytDlpReady || !ytDlp) {
         return res.status(503).json({ 
             success: false, 
-            message: 'Download service is initializing. Please try again in a moment.' 
+            message: 'Downloads require local installation. Download/clone this project and run: npm start' 
         });
     }
     
