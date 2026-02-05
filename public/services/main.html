@@ -406,7 +406,14 @@
 
         if (!response.ok) {
           const errData = await response.json();
-          throw new Error(errData.message || 'Failed to fetch video info');
+          let errorMessage = errData.message || 'Failed to fetch video info';
+          
+          // Check if this is a Vercel/serverless error
+          if (response.status === 503 && errorMessage.includes('locally')) {
+            errorMessage = '⚠️ Downloads only work locally! Clone this project and run: npm start';
+          }
+          
+          throw new Error(errorMessage);
         }
 
         const info = await response.json();

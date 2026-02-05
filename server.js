@@ -188,7 +188,7 @@ app.get('/api/check-login', (req, res) => {
 
 // Media download routes
 // Video Info route
-app.post('/api/video-info', requireAuth, requireYtDlp, async (req, res) => {
+app.post('/api/video-info', requireAuth, async (req, res) => {
     const { url } = req.body;
     try {
         if (!url) {
@@ -197,11 +197,20 @@ app.post('/api/video-info', requireAuth, requireYtDlp, async (req, res) => {
 
         console.log('Fetching video info for:', url);
         
-        // Check if running on Vercel (serverless)
-        if (process.env.VERCEL) {
+        // Check if running on Vercel (serverless) - check multiple ways
+        const isVercel = process.env.VERCEL || process.env.NOW_REGION || process.env.VERCEL_ENV;
+        if (isVercel) {
             return res.status(503).json({
                 success: false,
-                message: 'Video downloads are only available when running locally. Start the server with: npm start'
+                message: 'Video info fetching is only available when running locally. This web interface works on Vercel, but downloads require a local server.'
+            });
+        }
+        
+        // Check if ytDlp is initialized
+        if (!ytDlpReady || !ytDlp) {
+            return res.status(503).json({
+                success: false,
+                message: 'Download service is initializing. Please try again in a moment.'
             });
         }
         
@@ -274,12 +283,18 @@ app.post('/api/video-info', requireAuth, requireYtDlp, async (req, res) => {
 });
 
 // Streaming Video Download route with improved performance
-app.get('/api/download-video', requireAuth, requireYtDlp, async (req, res) => {
+app.get('/api/download-video', requireAuth, async (req, res) => {
     const { url, format, fileName } = req.query;
     
     // Check if running on Vercel (serverless)
-    if (process.env.VERCEL) {
-        return res.status(503).send('Video downloads are only available when running locally. Start the server with: npm start');
+    const isVercel = process.env.VERCEL || process.env.NOW_REGION || process.env.VERCEL_ENV;
+    if (isVercel) {
+        return res.status(503).send('Video downloads are only available when running locally. Clone the repo and run: npm start');
+    }
+    
+    // Check if ytDlp is initialized
+    if (!ytDlpReady || !ytDlp) {
+        return res.status(503).send('Download service is initializing. Please try again in a moment.');
     }
     
     let outputPath = null;
@@ -451,17 +466,21 @@ app.get('/api/download-video', requireAuth, requireYtDlp, async (req, res) => {
 });
 
 // Streaming Audio Download route with improved performance
-app.get('/api/download-audio', requireAuth, requireYtDlp, async (req, res) => {
+app.get('/api/download-audio', requireAuth, async (req, res) => {
     const { url, fileName } = req.query;
     
     // Check if running on Vercel (serverless)
-    if (process.env.VERCEL) {
-        return res.status(503).send('Audio downloads are only available when running locally. Start the server with: npm start');
+    const isVercel = process.env.VERCEL || process.env.NOW_REGION || process.env.VERCEL_ENV;
+    if (isVercel) {
+        return res.status(503).send('Audio downloads are only available when running locally. Clone the repo and run: npm start');
+    }
+    
+    // Check if ytDlp is initialized
+    if (!ytDlpReady || !ytDlp) {
+        return res.status(503).send('Download service is initializing. Please try again in a moment.');
     }
     
     let outputPath = null;
-    
-    try {
         if (!url) return res.status(400).send('URL is required');
 
         const safeFileName = (fileName || 'audio').replace(/[^a-z0-9._-]/gi, '_').substring(0, 50);
@@ -574,7 +593,7 @@ app.get('/api/download-audio', requireAuth, requireYtDlp, async (req, res) => {
 });
 
 // Facebook Download Route with streaming
-app.get('/api/download/facebook', requireAuth, requireYtDlp, async (req, res) => {
+app.get('/api/download/facebook', requireAuth, async (req, res) => {
     const { url } = req.query;
     let outputPath = null;
 
@@ -646,7 +665,7 @@ app.get('/api/download/facebook', requireAuth, requireYtDlp, async (req, res) =>
 });
 
 // Instagram Download Route with streaming
-app.get('/api/download/instagram', requireAuth, requireYtDlp, async (req, res) => {
+app.get('/api/download/instagram', requireAuth, async (req, res) => {
     const { url } = req.query;
     let outputPath = null;
 
@@ -718,7 +737,7 @@ app.get('/api/download/instagram', requireAuth, requireYtDlp, async (req, res) =
 });
 
 // Spotify Download Route with streaming
-app.get('/api/download/spotify', requireAuth, requireYtDlp, async (req, res) => {
+app.get('/api/download/spotify', requireAuth, async (req, res) => {
     const { url } = req.query;
     let outputPath = null;
 
