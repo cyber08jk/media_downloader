@@ -1,0 +1,10 @@
+yt-dlp.exe
+downloads
+.git
+.vscode
+node_modules
+test-ytdlp.js
+TROUBLESHOOTING.md
+USAGE_GUIDE.md
+DOWNLOAD_OPTIMIZATIONS.md
+README.md

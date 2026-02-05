@@ -196,6 +196,15 @@ app.post('/api/video-info', requireAuth, requireYtDlp, async (req, res) => {
         }
 
         console.log('Fetching video info for:', url);
+        
+        // Check if running on Vercel (serverless)
+        if (process.env.VERCEL) {
+            return res.status(503).json({
+                success: false,
+                message: 'Video downloads are only available when running locally. Start the server with: npm start'
+            });
+        }
+        
         const jsonOutput = await ytDlp.execPromise([
             url,
             '--dump-json',
@@ -267,6 +276,12 @@ app.post('/api/video-info', requireAuth, requireYtDlp, async (req, res) => {
 // Streaming Video Download route with improved performance
 app.get('/api/download-video', requireAuth, requireYtDlp, async (req, res) => {
     const { url, format, fileName } = req.query;
+    
+    // Check if running on Vercel (serverless)
+    if (process.env.VERCEL) {
+        return res.status(503).send('Video downloads are only available when running locally. Start the server with: npm start');
+    }
+    
     let outputPath = null;
     
     try {
@@ -438,6 +453,12 @@ app.get('/api/download-video', requireAuth, requireYtDlp, async (req, res) => {
 // Streaming Audio Download route with improved performance
 app.get('/api/download-audio', requireAuth, requireYtDlp, async (req, res) => {
     const { url, fileName } = req.query;
+    
+    // Check if running on Vercel (serverless)
+    if (process.env.VERCEL) {
+        return res.status(503).send('Audio downloads are only available when running locally. Start the server with: npm start');
+    }
+    
     let outputPath = null;
     
     try {
