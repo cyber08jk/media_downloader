@@ -172,39 +172,58 @@ app.post('/api/register', (req, res) => {
 });
 
 // Logout route
-// Helper function to handle online downloads via third-party services
-function handleOnlineDownload(res, url, format, fileName, mediaType) {
+// Helper function to get video info using ytdl-core
+async function getVideoInfoCustom(url) {
     try {
-        // Encode URL for services
-        const encodedUrl = encodeURIComponent(url);
+        const info = await ytdl.getInfo(url);
+        return {
+            videoId: info.videoDetails.videoId,
+            title: info.videoDetails.title,
+            duration: parseInt(info.videoDetails.lengthSeconds),
+            thumbnail: info.videoDetails.thumbnail.thumbnails[info.videoDetails.thumbnail.thumbnails.length - 1].url,
+            author: info.videoDetails.author.name,
+            channelId: info.videoDetails.channelId,
+            formats: info.formats
+        };
+    } catch (error) {
+        console.error('ytdl-core error:', error.message);
+        throw error;
+    }
+}
+
+// Helper function to stream download with custom handler
+async function streamVideoDownload(url, format, res, fileName, isAudio = false) {
+    try {
+        const stream = ytdl(url, {
+            quality: format === 'audio' ? 'highestaudio' : 'highest',
+            filter: isAudio ? 'audioonly' : 'videoandaudio'
+        });
+
+        const safeFileName = (fileName || 'video').replace(/[^a-z0-9._-]/gi, '_').substring(0, 50);
         
-        // Different services for different needs
-        let downloadUrl;
-        
-        if (mediaType === 'audio') {
-            // Audio download services (MP3)
-            downloadUrl = `https://y2mate.com/en/youtube-to-mp3?url=${encodedUrl}`;
+        if (isAudio) {
+            res.setHeader('Content-Type', 'audio/mpeg');
+            res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}.mp3"`);
         } else {
-            // Video download services
-            // Using y2mate as primary (most reliable)
-            downloadUrl = `https://y2mate.com/en/youtube-to-mp4?url=${encodedUrl}`;
+            res.setHeader('Content-Type', 'video/mp4');
+            res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}.mp4"`);
         }
         
-        // Return the download service URL for the user
-        // The browser will open this in a new tab/window
-        res.json({
-            success: true,
-            message: 'Opening download service in new tab...',
-            downloadUrl: downloadUrl,
-            note: 'Using online download service. You may need to follow additional steps on the download site.'
-        });
+        res.setHeader('Cache-Control', 'no-cache');
         
-    } catch (error) {
-        console.error('Online download error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Could not generate download link. Please try: 1) Use local app (npm start) 2) Visit y2mate.com manually'
+        stream.pipe(res);
+        
+        stream.on('error', (error) => {
+            console.error('Stream error:', error);
+            if (!res.headersSent) {
+                res.status(500).json({ success: false, message: 'Download failed' });
+            }
         });
+    } catch (error) {
+        console.error('Download error:', error);
+        if (!res.headersSent) {
+            res.status(500).json({ success: false, message: 'Failed to start download' });
+        }
     }
 }
 
@@ -218,7 +237,7 @@ app.get('/api/check-login', (req, res) => {
 });
 
 // Media download routes
-// Video Info route - works online and locally
+// Video Info route - uses custom ytdl-core logic
 app.post('/api/video-info', requireAuth, async (req, res) => {
     const { url } = req.body;
     try {
@@ -228,7 +247,7 @@ app.post('/api/video-info', requireAuth, async (req, res) => {
 
         console.log('Fetching video info for:', url);
         
-        // Try local yt-dlp first
+        // Try yt-dlp first if available
         if (ytDlpReady && ytDlp) {
             try {
                 const jsonOutput = await ytDlp.execPromise([
@@ -245,7 +264,6 @@ app.post('/api/video-info', requireAuth, async (req, res) => {
 
                 const info = JSON.parse(jsonOutput);
 
-                // Simplified format selection
                 const formats = [
                     {
                         type: 'video',
@@ -269,73 +287,34 @@ app.post('/api/video-info', requireAuth, async (req, res) => {
                     url: url
                 });
             } catch (error) {
-                console.log('yt-dlp failed, falling back to API:', error.message);
-                // Fall through to API fallback
+                console.log('yt-dlp failed, using ytdl-core:', error.message);
             }
         }
         
-        // Fallback: Use public API for metadata
-        console.log('Using fallback API for video info...');
-        const videoId = extractVideoId(url);
-        if (!videoId) {
-            return res.status(400).json({ success: false, message: 'Invalid YouTube URL' });
-        }
-
-        // Try noembed API (no key required)
-        try {
-            const apiUrl = `https://noembed.com/embed?url=${encodeURIComponent(url)}`;
-            const response = await fetch(apiUrl);
-            
-            if (response.ok) {
-                const data = await response.json();
-                
-                const formats = [
-                    {
-                        type: 'video',
-                        label: 'Video (Best Quality)',
-                        format: 'bestvideo+bestaudio/best',
-                        description: 'Highest quality video with audio'
-                    },
-                    {
-                        type: 'audio',
-                        label: 'Audio Only (Best Quality)',
-                        format: 'bestaudio/best',
-                        description: 'Highest quality audio only'
-                    }
-                ];
-
-                return res.json({
-                    title: data.title || 'Video',
-                    thumbnail: data.thumbnail_url || `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
-                    duration: data.duration || 0,
-                    formats: formats,
-                    url: url
-                });
-            }
-        } catch (apiError) {
-            console.log('Noembed API failed:', apiError.message);
-        }
-
-        // Final fallback: basic YouTube thumbnail
+        // Use custom ytdl-core logic for metadata
+        console.log('Using custom ytdl-core for video info...');
+        const videoInfo = await getVideoInfoCustom(url);
+        
         const formats = [
             {
                 type: 'video',
                 label: 'Video (Best Quality)',
-                format: 'bestvideo+bestaudio/best',
+                format: 'highest',
                 description: 'Highest quality video with audio'
             },
             {
                 type: 'audio',
                 label: 'Audio Only (Best Quality)',
-                format: 'bestaudio/best',
+                format: 'highestaudio',
                 description: 'Highest quality audio only'
             }
         ];
 
         return res.json({
-            title: 'Video',
-            thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
-            duration: 0,
+            title: videoInfo.title,
+            thumbnail: videoInfo.thumbnail,
+            duration: videoInfo.duration,
+            author: videoInfo.author,
             formats: formats,
             url: url
         });
@@ -372,13 +351,99 @@ function extractVideoId(url) {
 app.get('/api/download-video', requireAuth, async (req, res) => {
     const { url, format, fileName } = req.query;
     
-    // Check if yt-dlp is available (only local)
-    if (!ytDlpReady || !ytDlp) {
-        // Fallback: Use online download services for Vercel
-        return handleOnlineDownload(res, url, format, fileName, 'video');
+    try {
+        if (!url) return res.status(400).json({ success: false, message: 'URL is required' });
+
+        console.log(`Downloading video: ${url}`);
+        console.log(`Format requested: ${format || 'video'}`);
+        
+        // Try yt-dlp first if available
+        if (ytDlpReady && ytDlp) {
+            try {
+                let outputPath = null;
+                const safeFileName = (fileName || 'video').replace(/[^a-z0-9._-]/gi, '_').substring(0, 50);
+                const timestamp = Date.now();
+                outputPath = path.join(downloadsDir, `${safeFileName}_${timestamp}.%(ext)s`);
+                const expectedPath = path.join(downloadsDir, `${safeFileName}_${timestamp}.mp4`);
+
+                const formatArg = format === 'audio' ? 'bestaudio/best' : 'bestvideo+bestaudio/best';
+                
+                res.setHeader('Content-Type', 'video/mp4');
+                res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}.mp4"`);
+                res.setHeader('Cache-Control', 'no-cache');
+
+                const ytDlpArgs = [
+                    url,
+                    '-f', formatArg,
+                    '--merge-output-format', 'mp4',
+                    '--no-playlist',
+                    '--no-warnings',
+                    '--no-mtime',
+                    '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    '--referer', url,
+                    '--newline',
+                    '-o', outputPath
+                ];
+                
+                const ytDlpProcess = ytDlp.exec(ytDlpArgs);
+                
+                if (!ytDlpProcess) {
+                    throw new Error('Failed to start yt-dlp process');
+                }
+                
+                let errorLog = '';
+                if (ytDlpProcess.stderr) {
+                    ytDlpProcess.stderr.on('data', (data) => {
+                        errorLog += data.toString();
+                        console.log('yt-dlp:', data.toString());
+                    });
+                }
+
+                await new Promise((resolve, reject) => {
+                    ytDlpProcess.on('close', (code) => {
+                        if (code === 0) {
+                            resolve();
+                        } else {
+                            let errorMsg = 'Download failed - video may be unavailable';
+                            if (errorLog.includes('Video unavailable') || errorLog.includes('is not available')) {
+                                errorMsg = 'Video is unavailable or private';
+                            }
+                            reject(new Error(errorMsg));
+                        }
+                    });
+                });
+
+                // Stream the file
+                if (fs.existsSync(expectedPath)) {
+                    const fileStream = fs.createReadStream(expectedPath);
+                    fileStream.pipe(res);
+                    fileStream.on('end', () => {
+                        // Cleanup after streaming
+                        fs.unlink(expectedPath, (err) => {
+                            if (err) console.log('Cleanup note:', err.message);
+                        });
+                    });
+                } else {
+                    throw new Error('Download completed but file not found');
+                }
+                
+                return;
+            } catch (ytDlpError) {
+                console.log('yt-dlp download failed, using ytdl-core:', ytDlpError.message);
+            }
+        }
+        
+        // Use custom ytdl-core streaming
+        console.log('Using ytdl-core for streaming...');
+        await streamVideoDownload(url, format, res, fileName, false);
+        
+    } catch (error) {
+        console.error('Download error:', error);
+        if (!res.headersSent) {
+            res.status(500).json({ success: false, message: error.message || 'Download failed' });
+        }
     }
-    
-    let outputPath = null;
+});
     
     try {
         if (!url) return res.status(400).send('URL is required');
