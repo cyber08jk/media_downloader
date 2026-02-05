@@ -548,25 +548,8 @@
         const data = { url: videoInfo.url, format: formatTypeOrItag, fileName };
         const params = new URLSearchParams(data).toString();
         
-        // Fetch first to check if it's a redirect service
-        fetch(`${endpoint}?${params}`)
-          .then(res => res.json())
-          .then(data => {
-            if (data.downloadUrl) {
-              // Open the download service in a new tab
-              window.open(data.downloadUrl, '_blank');
-              if (data.note) {
-                alert(data.note);
-              }
-            } else {
-              // Direct download (local)
-              window.location.href = `${endpoint}?${params}`;
-            }
-          })
-          .catch(err => {
-            console.error('Download error:', err);
-            window.location.href = `${endpoint}?${params}`;
-          });
+        // Direct stream download - no API checking needed
+        window.location.href = `${endpoint}?${params}`;
       } else {
         // Old format with itag
         const endpoint = isAudio ? '/api/download-audio' : '/api/download-video';
