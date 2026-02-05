@@ -601,53 +601,90 @@ app.get('/api/download-video', requireAuth, async (req, res) => {
             }, 1000);
         });
 
-    } catch (error) {
-        console.error('Video download error:', error);
-        if (!res.headersSent) res.status(500).send('Download failed: ' + error.message);
-        // Cleanup on error
-        if (outputPath && fs.existsSync(outputPath)) {
-            fs.unlink(outputPath, () => {});
-        }
-    }
 });
 
-// Streaming Audio Download route with improved performance
+// Streaming Audio Download route
 app.get('/api/download-audio', requireAuth, async (req, res) => {
     const { url, fileName } = req.query;
     
-    // Check if yt-dlp is available (only local)
-    if (!ytDlpReady || !ytDlp) {
-        // Fallback: Use online download services for Vercel
-        return handleOnlineDownload(res, url, 'audio', fileName, 'audio');
-    }
-    
-    let outputPath = null;
-    
     try {
-        if (!url) return res.status(400).send('URL is required');
+        if (!url) return res.status(400).json({ success: false, message: 'URL is required' });
 
-        const safeFileName = (fileName || 'audio').replace(/[^a-z0-9._-]/gi, '_').substring(0, 50);
-        outputPath = path.join(downloadsDir, `${safeFileName}_${Date.now()}.mp3`);
+        console.log(`Downloading audio: ${url}`);
 
-        console.log(`Downloading audio (best quality): ${url}`);
+        // Try yt-dlp first if available
+        if (ytDlpReady && ytDlp) {
+            try {
+                const safeFileName = (fileName || 'audio').replace(/[^a-z0-9._-]/gi, '_').substring(0, 50);
+                const outputPath = path.join(downloadsDir, `${safeFileName}_${Date.now()}.mp3`);
 
-        // Set headers before starting download
-        res.setHeader('Content-Type', 'audio/mpeg');
-        res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}.mp3"`);
-        res.setHeader('Cache-Control', 'no-cache');
+                res.setHeader('Content-Type', 'audio/mpeg');
+                res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}.mp3"`);
+                res.setHeader('Cache-Control', 'no-cache');
 
-        const args = [
-            url,
-            '-x',
-            '--audio-format', 'mp3',
-            '--audio-quality', '0',  // Best quality
-            '--no-playlist',
-            '--no-warnings',
-            '--concurrent-fragments', '4',
-            '--buffer-size', '16K',
-            '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            '-o', outputPath
-        ];
+                const args = [
+                    url,
+                    '-x',
+                    '--audio-format', 'mp3',
+                    '--audio-quality', '0',
+                    '--no-playlist',
+                    '--no-warnings',
+                    '--concurrent-fragments', '4',
+                    '--buffer-size', '16K',
+                    '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    '-o', outputPath
+                ];
+
+                const audioProcess = ytDlp.exec(args);
+                if (!audioProcess) {
+                    throw new Error('Failed to start download');
+                }
+
+                let errorLog = '';
+                if (audioProcess.stderr) {
+                    audioProcess.stderr.on('data', (data) => {
+                        errorLog += data.toString();
+                        console.log('yt-dlp audio:', data.toString());
+                    });
+                }
+
+                await new Promise((resolve, reject) => {
+                    audioProcess.on('close', (code) => {
+                        if (code === 0) {
+                            resolve();
+                        } else {
+                            reject(new Error('Audio download failed'));
+                        }
+                    });
+                });
+
+                // Stream the file
+                if (fs.existsSync(outputPath)) {
+                    const fileStream = fs.createReadStream(outputPath);
+                    fileStream.pipe(res);
+                    fileStream.on('end', () => {
+                        fs.unlink(outputPath, (err) => {
+                            if (err) console.log('Cleanup note:', err.message);
+                        });
+                    });
+                    return;
+                }
+            } catch (ytDlpError) {
+                console.log('yt-dlp audio failed, using ytdl-core:', ytDlpError.message);
+            }
+        }
+        
+        // Use custom ytdl-core streaming for audio
+        console.log('Using ytdl-core for audio streaming...');
+        await streamVideoDownload(url, 'audio', res, fileName, true);
+        
+    } catch (error) {
+        console.error('Audio download error:', error);
+        if (!res.headersSent) {
+            res.status(500).json({ success: false, message: error.message || 'Download failed' });
+        }
+    }
+});
 
         const ytDlpProcess = ytDlp.exec(args);
         
