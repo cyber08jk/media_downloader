@@ -1,30 +1,51 @@
 {
   "version": 2,
+  "buildCommand": "npm install",
+  "devCommand": "npm start",
+  "env": {
+    "NODE_ENV": "production"
+  },
   "builds": [
     {
       "src": "server.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "public/**",
-      "use": "@vercel/static"
+      "use": "@vercel/node",
+      "config": {
+        "maxLambdaSize": "50mb"
+      }
     }
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "server.js"
+      "src": "/public/(.*)",
+      "dest": "/public/$1"
     },
     {
       "src": "/assets/(.*)",
-      "dest": "assets/$1"
+      "dest": "/assets/$1"
+    },
+    {
+      "src": "/css/(.*)",
+      "dest": "/css/$1"
+    },
+    {
+      "src": "/js/(.*)",
+      "dest": "/js/$1"
+    },
+    {
+      "src": "/images/(.*)",
+      "dest": "/images/$1"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "/server.js"
+    },
+    {
+      "src": "/(.*\\.html)$",
+      "dest": "/public/$1"
     },
     {
       "src": "/(.*)",
-      "dest": "public/$1"
+      "dest": "/server.js"
     }
-  ],
-  "env": {
-    "NODE_ENV": "production"
-  }
+  ]
 }

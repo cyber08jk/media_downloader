@@ -60,9 +60,10 @@ const downloadsDir = os.tmpdir();
 app.use(express.static('public'));
 app.use(express.static('assets'));
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'assets')));
 app.use('/js', express.static(path.join(__dirname, 'js')));
-app.use('/css', express.static(path.join(__dirname, 'public')));
-app.use('/images', express.static(path.join(__dirname, 'public/images')));
+app.use('/css', express.static(path.join(__dirname, 'css')));
+app.use('/images', express.static(path.join(__dirname, 'images')));
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
 
 // Session middleware
@@ -796,14 +797,19 @@ app.use((err, req, res, next) => {
     res.status(500).json({ success: false, message: 'Something went wrong!' });
 });
 
+// Default 404 handler
+app.use((req, res) => {
+    res.status(404).sendFile(path.join(__dirname, 'index.html'));
+});
+
 // Start server
 const PORT = process.env.PORT || 3000;
 
 // Export app for Vercel serverless
-if (process.env.VERCEL) {
-    module.exports = app;
-} else {
-    // Local development
+module.exports = app;
+
+// Only listen locally (not on Vercel)
+if (!process.env.VERCEL && require.main === module) {
     app.listen(PORT, () => {
         console.log(`Server running on http://localhost:${PORT}`);
         console.log('Optimizations enabled:');
