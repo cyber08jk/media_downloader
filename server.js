@@ -289,12 +289,18 @@ app.get('/api/download-video', requireAuth, async (req, res) => {
     // Check if running on Vercel (serverless)
     const isVercel = process.env.VERCEL || process.env.NOW_REGION || process.env.VERCEL_ENV;
     if (isVercel) {
-        return res.status(503).send('Video downloads are only available when running locally. Clone the repo and run: npm start');
+        return res.status(503).json({ 
+            success: false, 
+            message: 'Video downloads only work locally. Clone the repo and run: npm start' 
+        });
     }
     
     // Check if ytDlp is initialized
     if (!ytDlpReady || !ytDlp) {
-        return res.status(503).send('Download service is initializing. Please try again in a moment.');
+        return res.status(503).json({ 
+            success: false, 
+            message: 'Download service is initializing. Please try again in a moment.' 
+        });
     }
     
     let outputPath = null;
@@ -472,15 +478,23 @@ app.get('/api/download-audio', requireAuth, async (req, res) => {
     // Check if running on Vercel (serverless)
     const isVercel = process.env.VERCEL || process.env.NOW_REGION || process.env.VERCEL_ENV;
     if (isVercel) {
-        return res.status(503).send('Audio downloads are only available when running locally. Clone the repo and run: npm start');
+        return res.status(503).json({ 
+            success: false, 
+            message: 'Audio downloads only work locally. Clone the repo and run: npm start' 
+        });
     }
     
     // Check if ytDlp is initialized
     if (!ytDlpReady || !ytDlp) {
-        return res.status(503).send('Download service is initializing. Please try again in a moment.');
+        return res.status(503).json({ 
+            success: false, 
+            message: 'Download service is initializing. Please try again in a moment.' 
+        });
     }
     
     let outputPath = null;
+    
+    try {
         if (!url) return res.status(400).send('URL is required');
 
         const safeFileName = (fileName || 'audio').replace(/[^a-z0-9._-]/gi, '_').substring(0, 50);
@@ -595,11 +609,29 @@ app.get('/api/download-audio', requireAuth, async (req, res) => {
 // Facebook Download Route with streaming
 app.get('/api/download/facebook', requireAuth, async (req, res) => {
     const { url } = req.query;
+    
+    // Check if running on Vercel
+    const isVercel = process.env.VERCEL || process.env.NOW_REGION || process.env.VERCEL_ENV;
+    if (isVercel) {
+        return res.status(503).json({ 
+            success: false, 
+            message: 'Downloads only work locally. Clone the repo and run: npm start' 
+        });
+    }
+    
+    // Check if ytDlp is initialized
+    if (!ytDlpReady || !ytDlp) {
+        return res.status(503).json({ 
+            success: false, 
+            message: 'Download service is initializing. Please try again in a moment.' 
+        });
+    }
+    
     let outputPath = null;
 
     try {
         if (!url) {
-            return res.status(400).send('Invalid Facebook URL');
+            return res.status(400).json({ success: false, message: 'Invalid Facebook URL' });
         }
 
         outputPath = path.join(downloadsDir, `facebook_${Date.now()}.mp4`);
@@ -667,11 +699,29 @@ app.get('/api/download/facebook', requireAuth, async (req, res) => {
 // Instagram Download Route with streaming
 app.get('/api/download/instagram', requireAuth, async (req, res) => {
     const { url } = req.query;
+    
+    // Check if running on Vercel
+    const isVercel = process.env.VERCEL || process.env.NOW_REGION || process.env.VERCEL_ENV;
+    if (isVercel) {
+        return res.status(503).json({ 
+            success: false, 
+            message: 'Downloads only work locally. Clone the repo and run: npm start' 
+        });
+    }
+    
+    // Check if ytDlp is initialized
+    if (!ytDlpReady || !ytDlp) {
+        return res.status(503).json({ 
+            success: false, 
+            message: 'Download service is initializing. Please try again in a moment.' 
+        });
+    }
+    
     let outputPath = null;
 
     try {
         if (!url) {
-            return res.status(400).send('Invalid Instagram URL');
+            return res.status(400).json({ success: false, message: 'Invalid Instagram URL' });
         }
 
         outputPath = path.join(downloadsDir, `instagram_${Date.now()}.mp4`);
@@ -739,11 +789,29 @@ app.get('/api/download/instagram', requireAuth, async (req, res) => {
 // Spotify Download Route with streaming
 app.get('/api/download/spotify', requireAuth, async (req, res) => {
     const { url } = req.query;
+    
+    // Check if running on Vercel
+    const isVercel = process.env.VERCEL || process.env.NOW_REGION || process.env.VERCEL_ENV;
+    if (isVercel) {
+        return res.status(503).json({ 
+            success: false, 
+            message: 'Downloads only work locally. Clone the repo and run: npm start' 
+        });
+    }
+    
+    // Check if ytDlp is initialized
+    if (!ytDlpReady || !ytDlp) {
+        return res.status(503).json({ 
+            success: false, 
+            message: 'Download service is initializing. Please try again in a moment.' 
+        });
+    }
+    
     let outputPath = null;
 
     try {
         if (!url) {
-            return res.status(400).send('Invalid Spotify URL');
+            return res.status(400).json({ success: false, message: 'Invalid Spotify URL' });
         }
 
         outputPath = path.join(downloadsDir, `spotify_${Date.now()}.mp3`);
