@@ -797,9 +797,14 @@ app.use((err, req, res, next) => {
     res.status(500).json({ success: false, message: 'Something went wrong!' });
 });
 
-// Default 404 handler
+// 404 handler - serve index.html for SPA-like behavior
 app.use((req, res) => {
-    res.status(404).sendFile(path.join(__dirname, 'index.html'));
+    // Check if it's an API request
+    if (req.path.startsWith('/api/')) {
+        return res.status(404).json({ success: false, message: 'API endpoint not found' });
+    }
+    // For all other requests, serve index.html
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // Start server
