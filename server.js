@@ -756,11 +756,19 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-    console.log('Optimizations enabled:');
-    console.log('- File streaming for faster downloads');
-    console.log('- Concurrent connection handling');
-    console.log('- Automatic cleanup of temporary files');
-    console.log('- Enhanced error handling');
-});
+const PORT = process.env.PORT || 3000;
+
+// Export app for Vercel serverless
+if (process.env.VERCEL) {
+    module.exports = app;
+} else {
+    // Local development
+    app.listen(PORT, () => {
+        console.log(`Server running on http://localhost:${PORT}`);
+        console.log('Optimizations enabled:');
+        console.log('- File streaming for faster downloads');
+        console.log('- Concurrent connection handling');
+        console.log('- Automatic cleanup of temporary files');
+        console.log('- Enhanced error handling');
+    });
+}
