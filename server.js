@@ -8,7 +8,6 @@ const YTDlpWrap = require('yt-dlp-wrap').default;
 const os = require('os');
 
 const app = express();
-const PORT = 3000;
 
 // Optimize for downloads
 app.set('trust proxy', 1);
@@ -488,6 +487,14 @@ app.get('/api/download-audio', requireAuth, requireYtDlp, async (req, res) => {
         ];
 
         const ytDlpProcess = ytDlp.exec(args);
+        
+        let errorLog = '';
+        if (ytDlpProcess.stderr) {
+            ytDlpProcess.stderr.on('data', (data) => {
+                errorLog += data.toString();
+                console.log('yt-dlp:', data.toString());
+            });
+        }
 
         ytDlpProcess.on('error', (error) => {
             console.error('yt-dlp process error:', error);
@@ -498,8 +505,15 @@ app.get('/api/download-audio', requireAuth, requireYtDlp, async (req, res) => {
 
         await new Promise((resolve, reject) => {
             ytDlpProcess.on('close', (code) => {
-                if (code === 0) resolve();
-                else reject(new Error(`Process exited with code ${code}`));
+                if (code === 0) {
+                    resolve();
+                } else {
+                    let errorMsg = 'Audio download failed';
+                    if (errorLog.includes('ffmpeg not found') || errorLog.includes('ffprobe not found')) {
+                        errorMsg = 'FFmpeg is not installed. Please install it and try again.';
+                    }
+                    reject(new Error(errorMsg));
+                }
             });
         });
 
@@ -544,7 +558,13 @@ app.get('/api/download-audio', requireAuth, requireYtDlp, async (req, res) => {
 
     } catch (error) {
         console.error('Audio download error:', error);
-        if (!res.headersSent) res.status(500).send('Download failed: ' + error.message);
+        let errorMsg = 'Download failed: ' + error.message;
+        
+        if (error.message.includes('FFmpeg is not installed')) {
+            errorMsg = 'FFmpeg is required for audio downloads. Visit https://ffmpeg.org/download.html to install it.';
+        }
+        
+        if (!res.headersSent) res.status(500).send(errorMsg);
         // Cleanup on error
         if (outputPath && fs.existsSync(outputPath)) {
             fs.unlink(outputPath, () => {});
